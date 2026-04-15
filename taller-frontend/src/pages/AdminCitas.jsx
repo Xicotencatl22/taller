@@ -25,55 +25,48 @@ export default function AdminCitas() {
   const [citas, setCitas] = useState([]);
 
   useEffect(() => {
-    const savedCitas = localStorage.getItem('adminCitas');
-    if (savedCitas) {
-      setCitas(JSON.parse(savedCitas));
-    } else {
-      // Seed initial mock data
-      const mockCitas = [
-        {
-          id: 1,
-          cliente: 'María González',
-          email: 'maria@email.com',
-          telefono: '123-456-7890',
-          vehiculo: 'Toyota Corolla 2020',
-          servicio: 'Afinación básica',
-          fecha: '19/3/2026',
-          hora: '10:00 AM',
-          costo: 1540,
-          estado: 'Confirmada',
-          avatar: 'M'
-        },
-        {
-          id: 2,
-          cliente: 'Pedro Martínez',
-          email: 'pedro@email.com',
-          telefono: '123-456-7891',
-          vehiculo: 'Honda Civic 2019',
-          servicio: 'Cambio de aceite y filtro',
-          fecha: '20/3/2026',
-          hora: '2:00 PM',
-          costo: 850,
-          estado: 'Pendiente',
-          avatar: 'P'
-        },
-        {
-          id: 3,
-          cliente: 'Ana López',
-          email: 'ana@email.com',
-          telefono: '123-456-7892',
-          vehiculo: 'Nissan Sentra 2021',
-          servicio: 'Servicio de frenos básico',
-          fecha: '21/3/2026',
-          hora: '9:00 AM',
-          costo: 1800,
-          estado: 'Confirmada',
-          avatar: 'A'
-        }
-      ];
-      localStorage.setItem('adminCitas', JSON.stringify(mockCitas));
-      setCitas(mockCitas);
-    }
+    const mockCitas = [
+      {
+        id: 1,
+        cliente: 'María González',
+        email: 'maria@email.com',
+        telefono: '123-456-7890',
+        vehiculo: 'Toyota Corolla 2020',
+        servicio: 'Afinación básica',
+        fecha: '19/3/2026',
+        hora: '10:00 AM',
+        costo: 1540,
+        estado: 'Confirmada',
+        avatar: 'M'
+      },
+      {
+        id: 2,
+        cliente: 'Pedro Martínez',
+        email: 'pedro@email.com',
+        telefono: '123-456-7891',
+        vehiculo: 'Honda Civic 2019',
+        servicio: 'Cambio de aceite y filtro',
+        fecha: '20/3/2026',
+        hora: '2:00 PM',
+        costo: 850,
+        estado: 'Pendiente',
+        avatar: 'P'
+      },
+      {
+        id: 3,
+        cliente: 'Ana López',
+        email: 'ana@email.com',
+        telefono: '123-456-7892',
+        vehiculo: 'Nissan Sentra 2021',
+        servicio: 'Servicio de frenos básico',
+        fecha: '21/3/2026',
+        hora: '9:00 AM',
+        costo: 1800,
+        estado: 'Confirmada',
+        avatar: 'A'
+      }
+    ];
+    setCitas(mockCitas);
   }, []);
 
   // Modal State

@@ -5,9 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, roles, saveRole, deleteRole, saveUser, deleteUser } = useContext(AuthContext);
+  const { currentUser, roles, saveRole, deleteRole, users, saveUser, deleteUser } = useContext(AuthContext);
 
-  const [users, setUsers] = useState([]);
   const [tab, setTab] = useState(location.state?.tab || 'dashboard');
 
   useEffect(() => {
@@ -38,10 +37,7 @@ function AdminDashboard() {
 
   const PERMISSIONS = ['Dashboard','Citas','Vehículos','Servicios','Productos','Ventas','Compras','Cotizaciones','Reportes','Usuarios','Roles'];
 
-  useEffect(() => {
-    const storedUsers = JSON.parse(localStorage.getItem('users')) || [];
-    setUsers(storedUsers);
-  }, []);
+
 
   const counts = useMemo(() => {
     const totalUsers = users.length;
@@ -71,13 +67,11 @@ function AdminDashboard() {
 
     if (editingUserId) {
       // Update existing user
-      const updatedUsers = users.map(u =>
-        u.id === editingUserId
-          ? { ...u, name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone }
-          : u
-      );
-      setUsers(updatedUsers);
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
+      const result = saveUser({ id: editingUserId, name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
+      if (!result.success) {
+        setUserError(result.error);
+        return;
+      }
       setEditingUserId(null);
     } else {
       // Create new user
@@ -86,10 +80,9 @@ function AdminDashboard() {
         return;
       }
       const result = saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
-      if (result.success) {
-        setUsers(JSON.parse(localStorage.getItem('users')) || []);
-      } else {
+      if (!result.success) {
         setUserError(result.error || 'No se pudo crear usuario.');
+        return;
       }
     }
 
@@ -135,13 +128,11 @@ function AdminDashboard() {
     }
 
     if (editingRoleId) {
-      // Update existing role
-      const updated = roles.map(r =>
-        r.id === editingRoleId
-          ? { ...r, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions }
-          : r
-      );
-      localStorage.setItem('roles', JSON.stringify(updated));
+      const result = saveRole({ id: editingRoleId, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions });
+      if (!result.success) {
+        setRoleError(result.error);
+        return;
+      }
       setEditingRoleId(null);
     } else {
       // Create new role

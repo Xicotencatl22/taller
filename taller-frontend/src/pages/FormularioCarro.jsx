@@ -61,26 +61,10 @@ function FormularioCarro() {
   };
 
   const handleConfirmarCita = () => {
-    const existingCitas = JSON.parse(localStorage.getItem('adminCitas') || '[]');
     const marcaObj = fallbackMarcas.find(m => m.idmarca === form.idmarca);
     const modeloObj = (fallbackModelos[form.idmarca] || []).find(m => m.idmodelo === form.idmodelo);
     const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${form.idanio}`.trim();
 
-    const newCita = {
-      id: Date.now(),
-      cliente: contactoForm.nombre || 'Cliente Anónimo',
-      email: contactoForm.correo || 'N/A',
-      telefono: contactoForm.telefono || 'N/A',
-      vehiculo: vehiculoText || 'Vehículo sin especificar',
-      servicio: form.servicio || 'Servicio General',
-      fecha: `${selectedFecha.dia}/${selectedFecha.mes}/2026`,
-      hora: selectedHora,
-      costo: 1540,
-      estado: 'Pendiente',
-      avatar: contactoForm.nombre ? contactoForm.nombre.charAt(0).toUpperCase() : 'C'
-    };
-
-    localStorage.setItem('adminCitas', JSON.stringify([...existingCitas, newCita]));
     alert("¡Tu cita se ha confirmado exitosamente! Hemos notificado al administrador.");
     closeAndResetModal();
     navigate('/');

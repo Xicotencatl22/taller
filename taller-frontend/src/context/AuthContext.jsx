@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
 
@@ -38,56 +38,36 @@ const DEFAULT_ROLES = [
   },
 ];
 
+const DEFAULT_USERS = [
+  {
+    id: crypto.randomUUID(),
+    name: 'Administrador',
+    email: 'admin@admin.com',
+    password: 'admin123',
+    role: 'Administrador',
+    phone: '',
+  }
+];
+
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [roles, setRoles] = useState(DEFAULT_ROLES);
-
-  useEffect(() => {
-    // Force login by starting unauthenticated, even if there is a currentUser in localStorage
-    localStorage.removeItem('currentUser');
-
-    const savedRoles = JSON.parse(localStorage.getItem('roles')) || DEFAULT_ROLES;
-    setRoles(savedRoles);
-
-    if (!localStorage.getItem('roles')) {
-      localStorage.setItem('roles', JSON.stringify(DEFAULT_ROLES));
-    }
-
-    const currentUsers = JSON.parse(localStorage.getItem('users')) || [];
-    if (!currentUsers.some(u => u.role === 'Administrador')) {
-      const adminSeed = {
-        id: crypto.randomUUID(),
-        name: 'Administrador',
-        email: 'admin@admin.com',
-        password: 'admin123',
-        role: 'Administrador',
-        phone: '',
-      };
-      currentUsers.push(adminSeed);
-      localStorage.setItem('users', JSON.stringify(currentUsers));
-    }
-
-    setLoading(false);
-  }, []);
+  const [users, setUsersState] = useState(DEFAULT_USERS);
 
   const login = (email, password) => {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
     const user = users.find(u => u.email === email && u.password === password);
 
     if (user) {
       setIsAuthenticated(true);
       setCurrentUser(user);
-      localStorage.setItem('currentUser', JSON.stringify(user));
       return { success: true, user };
     }
     return { success: false };
   };
 
   const register = ({ name, email, password, role }) => {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-
     if (users.some(u => u.email === email)) {
       return { success: false, error: 'El correo ya está registrado' };
     }
@@ -101,55 +81,41 @@ export const AuthProvider = ({ children }) => {
       phone: '',
     };
 
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-
+    setUsersState([...users, newUser]);
     return { success: true };
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
   };
 
   const saveRole = (role) => {
-    const existingRoles = JSON.parse(localStorage.getItem('roles')) || [];
-    const exists = existingRoles.some((r) => r.id === role.id);
-    const updated = exists ? existingRoles.map(r => (r.id === role.id ? role : r)) : [...existingRoles, role];
-    localStorage.setItem('roles', JSON.stringify(updated));
-    setRoles(updated);
+    setRoles(prev => {
+      const exists = prev.some((r) => r.id === role.id);
+      return exists ? prev.map(r => (r.id === role.id ? role : r)) : [...prev, role];
+    });
     return { success: true };
   };
 
   const deleteRole = (roleId) => {
-    const existingRoles = JSON.parse(localStorage.getItem('roles')) || [];
-    const updated = existingRoles.filter((r) => r.id !== roleId);
-    localStorage.setItem('roles', JSON.stringify(updated));
-    setRoles(updated);
+    setRoles(prev => prev.filter((r) => r.id !== roleId));
     return { success: true };
   };
 
   const saveUser = (user) => {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const exists = users.some((u) => u.id === user.id);
-
-    if (exists) {
-      const updatedUsers = users.map((u) => (u.id === user.id ? user : u));
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
-      return { success: true };
-    }
-
-    user.id = crypto.randomUUID();
-    users.push(user);
-    localStorage.setItem('users', JSON.stringify(users));
+    setUsersState(prev => {
+      const exists = prev.some((u) => u.id === user.id);
+      if (exists) {
+        return prev.map((u) => (u.id === user.id ? user : u));
+      }
+      return [...prev, { ...user, id: crypto.randomUUID() }];
+    });
     return { success: true };
   };
 
   const deleteUser = (userId) => {
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const updated = users.filter((u) => u.id !== userId);
-    localStorage.setItem('users', JSON.stringify(updated));
+    setUsersState(prev => prev.filter((u) => u.id !== userId));
     return { success: true };
   };
 
@@ -165,6 +131,7 @@ export const AuthProvider = ({ children }) => {
         roles,
         saveRole,
         deleteRole,
+        users,
         saveUser,
         deleteUser,
       }}
