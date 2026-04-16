@@ -242,18 +242,27 @@ export default function Productos() {
                 </div>
 
                 {/* Row 3 */}
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock inicial <span className="text-red-500">*</span></label>
-                    <input type="number" className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none ${!editando ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`} required={editando}
-                      value={nuevo.stock} onChange={e => setNuevo({ ...nuevo, stock: e.target.value })} disabled={!editando} placeholder="0" />
+                {editando && (
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock <span className="text-red-500">*</span></label>
+                      <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
+                        value={nuevo.stock} onChange={e => setNuevo({ ...nuevo, stock: e.target.value })} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock mínimo <span className="text-red-500">*</span></label>
+                      <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
+                        value={nuevo.minStock} onChange={e => setNuevo({ ...nuevo, minStock: e.target.value })} placeholder="10" />
+                    </div>
                   </div>
+                )}
+                {!editando && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock mínimo <span className="text-red-500">*</span></label>
                     <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
                       value={nuevo.minStock} onChange={e => setNuevo({ ...nuevo, minStock: e.target.value })} placeholder="10" />
                   </div>
-                </div>
+                )}
 
                 {/* Row 4 */}
                 <div className="grid grid-cols-2 gap-5">
