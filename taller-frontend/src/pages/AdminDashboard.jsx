@@ -2,12 +2,13 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
+const PERMISSIONS = ['Dashboard','Citas','Vehículos','Servicios','Productos','Ventas','Compras','Cotizaciones','Reportes','Usuarios','Roles'];
+
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, roles, saveRole, deleteRole, saveUser, deleteUser } = useContext(AuthContext);
+  const { roles, users, saveRole, deleteRole, saveUser, deleteUser, fetchUsers } = useContext(AuthContext);
 
-  const [users, setUsers] = useState([]);
   const [tab, setTab] = useState(location.state?.tab || 'dashboard');
 
   useEffect(() => {
@@ -26,6 +27,9 @@ function AdminDashboard() {
   const [userPassword, setUserPassword] = useState('');
   const [userRole, setUserRole] = useState('Cliente');
   const [userError, setUserError] = useState('');
+  const [userNameError, setUserNameError] = useState('');
+  const [userEmailError, setUserEmailError] = useState('');
+  const [userPasswordError, setUserPasswordError] = useState('');
 
   // Role modal and filters
   const [roleModalOpen, setRoleModalOpen] = useState(false);
@@ -35,13 +39,58 @@ function AdminDashboard() {
   const [roleColor, setRoleColor] = useState('#A78BFA');
   const [rolePermissions, setRolePermissions] = useState([]);
   const [roleError, setRoleError] = useState('');
+  const [roleNameError, setRoleNameError] = useState('');
+  const [roleDescriptionError, setRoleDescriptionError] = useState('');
 
   const PERMISSIONS = ['Dashboard','Citas','Vehículos','Servicios','Productos','Ventas','Compras','Cotizaciones','Reportes','Usuarios','Roles'];
 
   useEffect(() => {
-    const storedUsers = JSON.parse(localStorage.getItem('users')) || [];
-    setUsers(storedUsers);
-  }, []);
+    if (fetchUsers) {
+      fetchUsers();
+    }
+  }, [fetchUsers]);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateUserNameField = () => {
+    const message = userName.trim() ? '' : 'El nombre completo es obligatorio.';
+    setUserNameError(message);
+    return !message;
+  };
+
+  const validateUserEmailField = () => {
+    const message = userEmail
+      ? emailRegex.test(userEmail) && userEmail.length < 64
+        ? ''
+        : 'Email inválido o demasiado largo.'
+      : 'El correo electrónico es obligatorio.';
+    setUserEmailError(message);
+    return !message;
+  };
+
+  const validateUserPasswordField = () => {
+    const message = userPassword
+      ? userPassword.length > 6 && /\d/.test(userPassword)
+        ? ''
+        : 'Contraseña debe tener más de 6 caracteres e incluir números.'
+      : editingUserId
+      ? ''
+      : 'La contraseña es obligatoria.';
+    setUserPasswordError(message);
+    return !message;
+  };
+
+  const validateRoleNameField = () => {
+    const message = roleName.trim() ? '' : 'El nombre del rol es obligatorio.';
+    setRoleNameError(message);
+    return !message;
+  };
+
+  const validateRoleDescriptionField = () => {
+    const message = roleDescription.trim() ? '' : 'La descripción del rol es obligatoria.';
+    setRoleDescriptionError(message);
+    return !message;
+  };
 
   const counts = useMemo(() => {
     const totalUsers = users.length;
@@ -51,45 +100,45 @@ function AdminDashboard() {
     return { totalUsers, adminCount, tecnicoCount, clientCount };
   }, [users]);
 
-  const handleUserSubmit = (e) => {
+  const handleUserSubmit = async (e) => {
     e.preventDefault();
     setUserError('');
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!userName || !userEmail || !userPassword || !userRole) {
-      setUserError('Completa todos los campos de usuario.');
-      return;
-    }
-    if (userEmail.length >= 64 || !emailRegex.test(userEmail)) {
-      setUserError('Email inválido o demasiado largo.');
-      return;
-    }
-    if (userPassword.length <= 6 || !/\d/.test(userPassword)) {
-      setUserError('Contraseña debe tener más de 6 caracteres e incluir números.');
+    const isNameValid = validateUserNameField();
+    const isEmailValid = validateUserEmailField();
+    const isPasswordValid = validateUserPasswordField();
+
+    if (!isNameValid || !isEmailValid || !isPasswordValid || !userRole) {
+      setUserError('Corrige los errores de usuario antes de continuar.');
       return;
     }
 
     if (editingUserId) {
-      // Update existing user
-      const updatedUsers = users.map(u =>
-        u.id === editingUserId
-          ? { ...u, name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone }
-          : u
-      );
-      setUsers(updatedUsers);
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
+      const updatedFields = {
+        id: editingUserId,
+        name: userName,
+        email: userEmail,
+        role: userRole,
+        phone: userPhone,
+      };
+      if (userPassword) {
+        updatedFields.password = userPassword;
+      }
+      const result = await saveUser(updatedFields);
+      if (!result.success) {
+        setUserError(result.error || 'No se pudo actualizar el usuario.');
+        return;
+      }
       setEditingUserId(null);
     } else {
-      // Create new user
       if (users.some((u) => u.email === userEmail)) {
         setUserError('Ya existe un usuario con ese correo.');
         return;
       }
-      const result = saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
-      if (result.success) {
-        setUsers(JSON.parse(localStorage.getItem('users')) || []);
-      } else {
+      const result = await saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
+      if (!result.success) {
         setUserError(result.error || 'No se pudo crear usuario.');
+        return;
       }
     }
 
@@ -107,7 +156,7 @@ function AdminDashboard() {
       setUserName(user.name);
       setUserEmail(user.email);
       setUserPhone(user.phone || '');
-      setUserPassword(user.password);
+      setUserPassword('');
       setUserRole(user.role);
     } else {
       setEditingUserId(null);
@@ -118,6 +167,9 @@ function AdminDashboard() {
       setUserRole('Cliente');
     }
     setUserError('');
+    setUserNameError('');
+    setUserEmailError('');
+    setUserPasswordError('');
     setUserModalOpen(true);
   };
 
@@ -126,33 +178,35 @@ function AdminDashboard() {
     setEditingUserId(null);
   };
 
-  const handleRoleSubmit = (e) => {
+  const handleRoleSubmit = async (e) => {
     e.preventDefault();
     setRoleError('');
-    if (!roleName || !roleDescription) {
-      setRoleError('Completa el nombre y la descripción del rol.');
+
+    const isNameValid = validateRoleNameField();
+    const isDescriptionValid = validateRoleDescriptionField();
+
+    if (!isNameValid || !isDescriptionValid) {
+      setRoleError('Corrige los errores del rol antes de continuar.');
       return;
     }
 
+    const roleData = {
+      name: roleName,
+      description: roleDescription,
+      color: roleColor,
+      permissions: rolePermissions,
+    };
+
     if (editingRoleId) {
-      // Update existing role
-      const updated = roles.map(r =>
-        r.id === editingRoleId
-          ? { ...r, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions }
-          : r
-      );
-      localStorage.setItem('roles', JSON.stringify(updated));
-      setEditingRoleId(null);
-    } else {
-      // Create new role
-      const roleId = roleName.trim().toLowerCase().replace(/\s+/g, '_');
-      const result = saveRole({ id: roleId, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions });
-      if (!result.success) {
-        setRoleError(result.error || 'No se pudo crear rol.');
-        return;
-      }
+      roleData.id = editingRoleId;
     }
 
+    const result = await saveRole(roleData);
+    if (!result.success) {
+      setRoleError(result.error || 'No se pudo guardar el rol.');
+      return;
+    }
+    setEditingRoleId(null);
     setRoleModalOpen(false);
     setRoleName('');
     setRoleDescription('');
@@ -175,6 +229,8 @@ function AdminDashboard() {
       setRolePermissions([]);
     }
     setRoleError('');
+    setRoleNameError('');
+    setRoleDescriptionError('');
     setRoleModalOpen(true);
   };
 
@@ -187,10 +243,12 @@ function AdminDashboard() {
     setRolePermissions((prev) => (prev.includes(perm) ? prev.filter((r) => r !== perm) : [...prev, perm]));
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
     if (window.confirm('¿Eliminar este usuario?')) {
-      deleteUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      const result = await deleteUser(id);
+      if (!result.success) {
+        alert(result.error || 'No se pudo eliminar el usuario.');
+      }
     }
   };
 
@@ -217,7 +275,7 @@ function AdminDashboard() {
     const usersWithRoles = users.filter(u => roles.some(r => r.name === u.role)).length;
     const totalPermissions = PERMISSIONS.length;
     return { totalRoles, adminRoles, usersWithRoles, totalPermissions };
-  }, [roles, users]);
+  }, [roles, users, PERMISSIONS.length]);
 
   return (
     <div className="flex h-screen bg-gray-50 text-left overflow-hidden">
@@ -543,14 +601,36 @@ function AdminDashboard() {
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" /></svg>
                           Nombre completo *
                         </label>
-                        <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Juan Pérez García" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="text"
+                          value={userName}
+                          onChange={(e) => {
+                            setUserName(e.target.value);
+                            if (userNameError) setUserNameError('');
+                          }}
+                          onBlur={validateUserNameField}
+                          placeholder="Juan Pérez García"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userNameError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userNameError && <p className="mt-2 text-sm text-red-600">{userNameError}</p>}
                       </div>
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
                           Correo electrónico *
                         </label>
-                        <input type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="juan@email.com" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="email"
+                          value={userEmail}
+                          onChange={(e) => {
+                            setUserEmail(e.target.value);
+                            if (userEmailError) setUserEmailError('');
+                          }}
+                          onBlur={validateUserEmailField}
+                          placeholder="juan@email.com"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userEmailError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userEmailError && <p className="mt-2 text-sm text-red-600">{userEmailError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Teléfono (opcional)</label>
@@ -558,7 +638,18 @@ function AdminDashboard() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Contraseña *</label>
-                        <input type="password" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} placeholder="Mín. 6 caracteres con números" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="password"
+                          value={userPassword}
+                          onChange={(e) => {
+                            setUserPassword(e.target.value);
+                            if (userPasswordError) setUserPasswordError('');
+                          }}
+                          onBlur={validateUserPasswordField}
+                          placeholder="Mín. 6 caracteres con números"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userPasswordError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userPasswordError && <p className="mt-2 text-sm text-red-600">{userPasswordError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Seleccionar rol *</label>
@@ -660,11 +751,33 @@ function AdminDashboard() {
                     <form onSubmit={handleRoleSubmit} className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Nombre del rol *</label>
-                        <input type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="Ej: Gerente, Vendedor..." className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="text"
+                          value={roleName}
+                          onChange={(e) => {
+                            setRoleName(e.target.value);
+                            if (roleNameError) setRoleNameError('');
+                          }}
+                          onBlur={validateRoleNameField}
+                          placeholder="Ej: Gerente, Vendedor..."
+                          className={`w-full p-2.5 rounded-lg text-sm ${roleNameError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {roleNameError && <p className="mt-2 text-sm text-red-600">{roleNameError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Descripción *</label>
-                        <textarea value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} placeholder="Breve descripción del rol..." className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" rows="2"></textarea>
+                        <textarea
+                          value={roleDescription}
+                          onChange={(e) => {
+                            setRoleDescription(e.target.value);
+                            if (roleDescriptionError) setRoleDescriptionError('');
+                          }}
+                          onBlur={validateRoleDescriptionField}
+                          placeholder="Breve descripción del rol..."
+                          className={`w-full p-2.5 rounded-lg text-sm ${roleDescriptionError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                          rows="2"
+                        ></textarea>
+                        {roleDescriptionError && <p className="mt-2 text-sm text-red-600">{roleDescriptionError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-2">Color</label>

@@ -7,45 +7,55 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const validateEmail = (email) => {
+  const validateEmail = (value) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return email.length < 64 && emailRegex.test(email);
+    return value.length < 64 && emailRegex.test(value);
   };
 
-  const handleSubmit = (e) => {
+  const validateEmailField = () => {
+    const message = email ? (validateEmail(email) ? "" : "El correo electrónico no es válido") : "El correo electrónico es obligatorio.";
+    setEmailError(message);
+    return !message;
+  };
+
+  const validatePasswordField = () => {
+    const message = password ? "" : "La contraseña es obligatoria.";
+    setPasswordError(message);
+    return !message;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!email || !password) {
-      setError("Por favor rellena todos los campos");
-      return;
-    }
+    const isEmailValid = validateEmailField();
+    const isPasswordValid = validatePasswordField();
 
-    if (!validateEmail(email)) {
-      setError("El correo electrónico no es válido");
+    if (!isEmailValid || !isPasswordValid) {
+      setError("Corrige los errores antes de continuar.");
       return;
     }
 
     setLoading(true);
 
-    setTimeout(() => {
-      const result = login(email, password);
-      if (result.success) {
-        if (result.user?.role === "Administrador") {
-          navigate("/admin");
-        } else {
-          navigate("/");
-        }
+    const result = await login(email, password);
+    if (result.success) {
+      if (result.user?.role === "Administrador") {
+        navigate("/admin");
       } else {
-        setError("Correo o contraseña incorrectos");
-        setPassword("");
+        navigate("/");
       }
-      setLoading(false);
-    }, 500);
+    } else {
+      setError(result.error || "Correo o contraseña incorrectos");
+      setPassword("");
+    }
+    setLoading(false);
   };
 
   return (
@@ -84,10 +94,15 @@ function Login() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError("");
+                }}
+                onBlur={validateEmailField}
                 placeholder="ejemplo@correo.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${emailError ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
             </div>
 
             {/* Password field */}
@@ -99,10 +114,16 @@ function Login() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError("");
+                  }}
+                  onBlur={validatePasswordField}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${passwordError ? 'border-red-500' : 'border-gray-300'}`}
                 />
+              </div>
+              {passwordError && <p className="mt-2 text-sm text-red-600">{passwordError}</p>}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}

@@ -5,65 +5,90 @@ import { AuthContext } from "../context/AuthContext";
 function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("Cliente");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { register, roles } = useContext(AuthContext);
+  const { register } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const validateEmail = (email) => {
+  const validateEmail = (value) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return email.length < 64 && emailRegex.test(email);
+    return value.length < 64 && emailRegex.test(value);
   };
 
-  const validatePassword = (password) => {
-    // Must contain numbers, be longer than 6 chars
-    const hasNumbers = /\d/.test(password);
-    const isLongEnough = password.length > 6;
+  const validatePassword = (value) => {
+    const hasNumbers = /\d/.test(value);
+    const isLongEnough = value.length > 6;
     return hasNumbers && isLongEnough;
   };
 
-  const handleSubmit = (e) => {
+  const validateNameField = () => {
+    const message = name.trim() ? "" : "El nombre completo es obligatorio.";
+    setNameError(message);
+    return !message;
+  };
+
+  const validateEmailField = () => {
+    const message = email ? (validateEmail(email) ? "" : "El correo electrónico no es válido (debe contener @ y un dominio)") : "El correo electrónico es obligatorio.";
+    setEmailError(message);
+    return !message;
+  };
+
+  const validatePhoneField = () => {
+    const message = phone && phone.length > 20 ? "El teléfono es demasiado largo." : "";
+    setPhoneError(message);
+    return !message;
+  };
+
+  const validatePasswordField = () => {
+    const message = password ? (validatePassword(password) ? "" : "La contraseña debe tener más de 6 caracteres e incluir números") : "La contraseña es obligatoria.";
+    setPasswordError(message);
+    return !message;
+  };
+
+  const validateConfirmPasswordField = () => {
+    const message = confirmPassword ? (password === confirmPassword ? "" : "Las contraseñas no coinciden") : "Debes confirmar tu contraseña.";
+    setConfirmPasswordError(message);
+    return !message;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!name || !email || !role || !password || !confirmPassword) {
-      setError("Por favor rellena todos los campos");
-      return;
-    }
+    const isNameValid = validateNameField();
+    const isEmailValid = validateEmailField();
+    const isPhoneValid = validatePhoneField();
+    const isPasswordValid = validatePasswordField();
+    const isConfirmPasswordValid = validateConfirmPasswordField();
 
-    if (!validateEmail(email)) {
-      setError("El correo electrónico no es válido (debe contener @ y un dominio)");
-      return;
-    }
-
-    if (!validatePassword(password)) {
-      setError("La contraseña debe tener más de 6 caracteres e incluir números");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+    if (!isNameValid || !isEmailValid || !isPhoneValid || !isPasswordValid || !isConfirmPasswordValid) {
+      setError("Corrige los errores marcados antes de continuar.");
       return;
     }
 
     setLoading(true);
 
-    setTimeout(() => {
-      const result = register({ name, email, password, role });
-      if (result.success) {
-        navigate("/login");
-      } else {
-        setError(result.error);
-        setPassword("");
-        setConfirmPassword("");
-      }
-      setLoading(false);
-    }, 500);
+    setLoading(true);
+
+    const result = await register({ name, email, password, phone });
+    if (result.success) {
+      navigate("/login");
+    } else {
+      setError(result.error);
+      setPassword("");
+      setConfirmPassword("");
+    }
+    setLoading(false);
   };
 
   return (
@@ -100,10 +125,15 @@ function Register() {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (nameError) setNameError("");
+                }}
+                onBlur={validateNameField}
                 placeholder="Juan Pérez García"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${nameError ? 'border-red-500 border' : 'border border-gray-300'}`}
               />
+              {nameError && <p className="mt-2 text-sm text-red-600">{nameError}</p>}
             </div>
 
             {/* Email field */}
@@ -114,26 +144,32 @@ function Register() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError("");
+                }}
+                onBlur={validateEmailField}
                 placeholder="ejemplo@correo.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${emailError ? 'border-red-500' : 'border-gray-300'}`}
               />
+              {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
             </div>
 
-            {/* Role field */}
+            {/* Phone field */}
             <div>
-              <label className="block text-gray-700 font-semibold mb-2">Rol</label>
-              <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                {roles.map((roleOption) => (
-                  <option key={roleOption.id} value={roleOption.name}>
-                    {roleOption.name}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-gray-700 font-semibold mb-2">Teléfono</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (phoneError) setPhoneError("");
+                }}
+                onBlur={validatePhoneField}
+                placeholder="+56 9 1234 5678"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${phoneError ? 'border-red-500' : 'border-gray-300'}`}
+              />
+              {phoneError && <p className="mt-2 text-sm text-red-600">{phoneError}</p>}
             </div>
 
             {/* Password field */}
@@ -145,9 +181,13 @@ function Register() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError("");
+                  }}
+                  onBlur={validatePasswordField}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${passwordError ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 <button
                   type="button"
@@ -157,6 +197,7 @@ function Register() {
                   {showPassword ? "👁️" : "👁️‍🗨️"}
                 </button>
               </div>
+              {passwordError && <p className="mt-2 text-sm text-red-600">{passwordError}</p>}
               <p className="text-xs text-gray-500 mt-1">
                 Mínimo 7 caracteres e incluir números
               </p>
@@ -171,9 +212,13 @@ function Register() {
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (confirmPasswordError) setConfirmPasswordError("");
+                  }}
+                  onBlur={validateConfirmPasswordField}
                   placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${confirmPasswordError ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 <button
                   type="button"
@@ -183,6 +228,7 @@ function Register() {
                   {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
                 </button>
               </div>
+              {confirmPasswordError && <p className="mt-2 text-sm text-red-600">{confirmPasswordError}</p>}
             </div>
 
             {/* Error message */}
