@@ -56,7 +56,7 @@ export default function Cotizaciones() {
     cliente: '',
     email: '',
     vehiculo: '',
-    servicio: '',
+    servicios: [],
     manoObra: '',
     refacciones: '',
     validaHasta: ''
@@ -285,11 +285,43 @@ export default function Cotizaciones() {
                       <input type="text" placeholder="Toyota Corolla 2020" className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicio *</label>
-                      <select className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                        <option>Seleccionar servicio</option>
-                        {listaPrecios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                      </select>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicios *</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                        {listaPrecios.map(s => {
+                          const isSelected = newQuoteForm.servicios?.includes(s.id);
+                          return (
+                            <label key={s.id} className={`flex items-start gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                              <input 
+                                type="checkbox" 
+                                className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                                checked={isSelected || false}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setNewQuoteForm(prev => {
+                                    const current = prev.servicios || [];
+                                    const newServicios = checked ? [...current, s.id] : current.filter(id => id !== s.id);
+                                    
+                                    const selectedItems = listaPrecios.filter(item => newServicios.includes(item.id));
+                                    const totalManoObra = selectedItems.reduce((acc, item) => acc + item.manoObra, 0);
+                                    const totalRefacciones = selectedItems.reduce((acc, item) => acc + item.refacciones, 0);
+
+                                    return {
+                                      ...prev,
+                                      servicios: newServicios,
+                                      manoObra: totalManoObra || '',
+                                      refacciones: totalRefacciones || ''
+                                    };
+                                  });
+                                }}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-800 leading-tight">{s.nombre}</span>
+                                <span className="text-xs text-gray-500 mt-1">${s.total}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
