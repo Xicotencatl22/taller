@@ -122,8 +122,6 @@ function Login() {
                   placeholder="••••••••"
                   className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${passwordError ? 'border-red-500' : 'border-gray-300'}`}
                 />
-              </div>
-              {passwordError && <p className="mt-2 text-sm text-red-600">{passwordError}</p>}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -132,6 +130,7 @@ function Login() {
                   {showPassword ? "👁️" : "👁️‍🗨️"}
                 </button>
               </div>
+              {passwordError && <p className="mt-2 text-sm text-red-600">{passwordError}</p>}
             </div>
 
             {/* Error message */}
