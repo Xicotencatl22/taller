@@ -79,7 +79,7 @@ export default function Cotizaciones() {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Cotizaciones</h1>
-            <p className="text-gray-500">Administra las cotizaciones y actualiza precios</p>
+            <p className="text-gray-500">Administra las cotizaciones en el sistema</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -226,11 +226,6 @@ export default function Cotizaciones() {
                 ))}
               </div>
 
-              <div className="p-6 border-t border-gray-100">
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg text-sm font-bold transition-colors">
-                  Actualizar precios
-                </button>
-              </div>
             </div>
           </div>
 
