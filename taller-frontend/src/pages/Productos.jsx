@@ -261,6 +261,7 @@ export default function Productos() {
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock mínimo <span className="text-red-500">*</span></label>
                     <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
                       value={nuevo.minStock} onChange={e => setNuevo({ ...nuevo, minStock: e.target.value })} placeholder="10" />
+                    <p className="text-xs text-gray-500 mt-2">El stock inicial se asigna automáticamente en 0 y no puede ingresarse manualmente.</p>
                   </div>
                 )}
 
