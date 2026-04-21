@@ -142,7 +142,7 @@ export default function Productos() {
                     <div className="text-sm text-gray-900 mt-1">{p.minStock}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1 font-medium text-left">Costo unitario</div>
+                    <div className="text-[11px] text-gray-500 mb-1 font-medium text-left">Costo de compra</div>
                     <div className="text-sm text-gray-900 mt-1">${p.costo}</div>
                   </div>
                   <div>
@@ -268,7 +268,7 @@ export default function Productos() {
                 {/* Row 4 */}
                 <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo unitario (MXN) <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo de compra (MXN) <span className="text-red-500">*</span></label>
                     <input type="number" step="0.01" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
                       value={nuevo.costo} onChange={e => setNuevo({ ...nuevo, costo: e.target.value })} placeholder="180.00" />
                   </div>
