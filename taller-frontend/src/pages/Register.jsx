@@ -5,10 +5,7 @@ import { AuthContext } from "../context/AuthContext";
 function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-<<<<<<< HEAD
   const [phone, setPhone] = useState("");
-=======
->>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -68,18 +65,11 @@ function Register() {
     e.preventDefault();
     setError("");
 
-<<<<<<< HEAD
     const isNameValid = validateNameField();
     const isEmailValid = validateEmailField();
     const isPhoneValid = validatePhoneField();
     const isPasswordValid = validatePasswordField();
     const isConfirmPasswordValid = validateConfirmPasswordField();
-=======
-    if (!name || !email || !password || !confirmPassword) {
-      setError("Por favor rellena todos los campos");
-      return;
-    }
->>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
 
     if (!isNameValid || !isEmailValid || !isPhoneValid || !isPasswordValid || !isConfirmPasswordValid) {
       setError("Corrige los errores marcados antes de continuar.");
@@ -88,7 +78,6 @@ function Register() {
 
     setLoading(true);
 
-<<<<<<< HEAD
     setLoading(true);
 
     const result = await register({ name, email, password, phone });
@@ -100,19 +89,6 @@ function Register() {
       setConfirmPassword("");
     }
     setLoading(false);
-=======
-    setTimeout(() => {
-      const result = register({ name, email, password, role: "Cliente" });
-      if (result.success) {
-        navigate("/login");
-      } else {
-        setError(result.error);
-        setPassword("");
-        setConfirmPassword("");
-      }
-      setLoading(false);
-    }, 500);
->>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
   };
 
   return (
@@ -179,7 +155,6 @@ function Register() {
               {emailError && <p className="mt-2 text-sm text-red-600">{emailError}</p>}
             </div>
 
-<<<<<<< HEAD
             {/* Phone field */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2">Teléfono</label>
@@ -197,8 +172,6 @@ function Register() {
               {phoneError && <p className="mt-2 text-sm text-red-600">{phoneError}</p>}
             </div>
 
-=======
->>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
             {/* Password field */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2">
