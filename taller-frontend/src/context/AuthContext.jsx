@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 ﻿/* eslint-disable react-refresh/only-export-components */
+=======
+>>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
 import React, { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
@@ -39,13 +42,27 @@ const DEFAULT_ROLES = [
   },
 ];
 
+<<<<<<< HEAD
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:4000';
+=======
+const DEFAULT_USERS = [
+  {
+    id: crypto.randomUUID(),
+    name: 'Administrador',
+    email: 'admin@admin.com',
+    password: 'admin123',
+    role: 'Administrador',
+    phone: '',
+  }
+];
+>>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [roles, setRoles] = useState(DEFAULT_ROLES);
+<<<<<<< HEAD
   const [users, setUsers] = useState([]);
 
   const fetchRoles = async () => {
@@ -75,6 +92,24 @@ export const AuthProvider = ({ children }) => {
     if (savedCurrentUser) {
       setCurrentUser(savedCurrentUser);
       setIsAuthenticated(true);
+=======
+  const [users, setUsersState] = useState(DEFAULT_USERS);
+
+  const login = (email, password) => {
+    const user = users.find(u => u.email === email && u.password === password);
+
+    if (user) {
+      setIsAuthenticated(true);
+      setCurrentUser(user);
+      return { success: true, user };
+    }
+    return { success: false };
+  };
+
+  const register = ({ name, email, password, role }) => {
+    if (users.some(u => u.email === email)) {
+      return { success: false, error: 'El correo ya está registrado' };
+>>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
     }
 
     const initialize = async () => {
@@ -82,6 +117,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     };
 
+<<<<<<< HEAD
     initialize();
   }, []);
 
@@ -120,14 +156,18 @@ export const AuthProvider = ({ children }) => {
     } catch {
       return { success: false, error: 'No fue posible registrarse' };
     }
+=======
+    setUsersState([...users, newUser]);
+    return { success: true };
+>>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
   };
 
+<<<<<<< HEAD
   const saveRole = async (role) => {
     try {
       const method = role.id ? 'PUT' : 'POST';
@@ -205,6 +245,35 @@ export const AuthProvider = ({ children }) => {
     } catch {
       return { success: false, error: 'No se pudo eliminar el usuario' };
     }
+=======
+  const saveRole = (role) => {
+    setRoles(prev => {
+      const exists = prev.some((r) => r.id === role.id);
+      return exists ? prev.map(r => (r.id === role.id ? role : r)) : [...prev, role];
+    });
+    return { success: true };
+  };
+
+  const deleteRole = (roleId) => {
+    setRoles(prev => prev.filter((r) => r.id !== roleId));
+    return { success: true };
+  };
+
+  const saveUser = (user) => {
+    setUsersState(prev => {
+      const exists = prev.some((u) => u.id === user.id);
+      if (exists) {
+        return prev.map((u) => (u.id === user.id ? user : u));
+      }
+      return [...prev, { ...user, id: crypto.randomUUID() }];
+    });
+    return { success: true };
+  };
+
+  const deleteUser = (userId) => {
+    setUsersState(prev => prev.filter((u) => u.id !== userId));
+    return { success: true };
+>>>>>>> 556a59881b9f12314f827fd66d2d8b6d6abfcb2c
   };
 
   return (
@@ -220,6 +289,7 @@ export const AuthProvider = ({ children }) => {
         users,
         saveRole,
         deleteRole,
+        users,
         saveUser,
         deleteUser,
         fetchUsers,

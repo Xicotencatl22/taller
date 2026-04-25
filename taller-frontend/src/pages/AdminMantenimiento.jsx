@@ -1,0 +1,414 @@
+import React, { useState } from 'react';
+import AdminLayout from '../layouts/AdminLayout';
+
+export default function AdminMantenimiento() {
+  const [mantenimientos, setMantenimientos] = useState([
+    {
+      id: 1,
+      servicioBase: 'Servicio de frenos básico',
+      vehiculo: 'Toyota Corolla 2020 • ABC-123-XYZ',
+      fecha: '14/2/2026',
+      precioTotal: 1800,
+      estado: 'Completado',
+      propietario: 'María González',
+      kilometraje: '45,230 km',
+      tecnico: 'Juan Pérez',
+      observaciones: 'Se reemplazaron pastillas delanteras y se ajustó sistema de frenos.',
+      partes: ['Pastillas de freno delanteras x1', 'Líquido de frenos DOT 4 x1']
+    }
+  ]);
+
+  const serviciosPredefinidos = [
+    { id: 1, nombre: 'Cambio de aceite y filtro', precio: 450 },
+    { id: 2, nombre: 'Afinación básica', precio: 650 },
+    { id: 3, nombre: 'Servicio de frenos básico', precio: 800 }
+  ];
+
+  const vehiculosMock = [
+    { id: 1, nombre: 'Toyota Corolla 2020 • ABC-123-XYZ' },
+    { id: 2, nombre: 'Honda Civic 2019 • DEF-456-ABC' }
+  ];
+
+  const tecnicosMock = ['Juan Pérez', 'Carlos García', 'Luis Sánchez'];
+
+  const [showModal, setShowModal] = useState(false);
+  const [nuevo, setNuevo] = useState({
+    vehiculo: '',
+    kilometraje: '',
+    tecnico: '',
+    estado: 'En proceso',
+    fecha: new Date().toISOString().split('T')[0],
+    observaciones: '',
+  });
+
+  const [trabajos, setTrabajos] = useState([]);
+  const [nuevoTrabajo, setNuevoTrabajo] = useState({ servicioId: '', descripcion: '', precio: '' });
+
+  const [refacciones, setRefacciones] = useState([]);
+  const [nuevaRefaccion, setNuevaRefaccion] = useState({ nombre: '', cantidad: 1, precio: '' });
+
+  const handleServicioChange = (e) => {
+    const sId = Number(e.target.value);
+    const srv = serviciosPredefinidos.find(s => s.id === sId);
+    setNuevoTrabajo({
+      ...nuevoTrabajo,
+      servicioId: sId,
+      precio: srv ? srv.precio : ''
+    });
+  };
+
+  const agregarTrabajo = () => {
+    if (nuevoTrabajo.servicioId && nuevoTrabajo.precio !== '') {
+      const srv = serviciosPredefinidos.find(s => s.id === nuevoTrabajo.servicioId);
+      setTrabajos([...trabajos, { ...nuevoTrabajo, nombre: srv.nombre, id: Date.now() }]);
+      setNuevoTrabajo({ servicioId: '', descripcion: '', precio: '' });
+    }
+  };
+
+  const eliminarTrabajo = (id) => {
+    setTrabajos(trabajos.filter(t => t.id !== id));
+  };
+
+  const agregarRefaccion = () => {
+    if (nuevaRefaccion.nombre && nuevaRefaccion.cantidad && nuevaRefaccion.precio !== '') {
+      setRefacciones([...refacciones, { ...nuevaRefaccion, id: Date.now() }]);
+      setNuevaRefaccion({ nombre: '', cantidad: 1, precio: '' });
+    }
+  };
+
+  const eliminarRefaccion = (id) => {
+    setRefacciones(refacciones.filter(r => r.id !== id));
+  };
+
+  const calcularTotal = () => {
+    let totalAct = trabajos.reduce((acc, t) => acc + Number(t.precio), 0);
+    totalAct += refacciones.reduce((acc, r) => acc + (Number(r.cantidad) * Number(r.precio)), 0);
+    return totalAct;
+  };
+
+  const manejarEnvio = (e) => {
+    e.preventDefault();
+    if (!nuevo.vehiculo) return alert("Selecciona un vehículo");
+
+    const servicioBaseName = trabajos.length > 0 ? trabajos[0].nombre : 'Mantenimiento General';
+    const partesArray = refacciones.map(r => `${r.nombre} x${r.cantidad}`);
+
+    setMantenimientos([{
+      id: Date.now(),
+      servicioBase: servicioBaseName,
+      vehiculo: nuevo.vehiculo,
+      fecha: nuevo.fecha,
+      precioTotal: calcularTotal(),
+      estado: nuevo.estado,
+      propietario: 'Propietario Demo',
+      kilometraje: nuevo.kilometraje,
+      tecnico: nuevo.tecnico,
+      observaciones: nuevo.observaciones,
+      partes: partesArray
+    }, ...mantenimientos]);
+
+    cerrarModal();
+  };
+
+  const cerrarModal = () => {
+    setShowModal(false);
+    setNuevo({ vehiculo: '', kilometraje: '', tecnico: '', estado: 'En proceso', fecha: new Date().toISOString().split('T')[0], observaciones: '' });
+    setTrabajos([]);
+    setRefacciones([]);
+    setNuevoTrabajo({ servicioId: '', descripcion: '', precio: '' });
+    setNuevaRefaccion({ nombre: '', cantidad: 1, precio: '' });
+  };
+
+  const totalCompletados = mantenimientos.filter(m => m.estado === 'Completado').length;
+  const totalEnProceso = mantenimientos.filter(m => m.estado === 'En proceso').length;
+  const ingresosTotales = mantenimientos.reduce((acc, m) => acc + m.precioTotal, 0);
+
+  return (
+    <AdminLayout activeTab="mantenimiento">
+      <div className="p-8 max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-1">Gestión de Mantenimiento</h2>
+            <p className="text-gray-500 text-sm">Registra y administra el mantenimiento de vehículos</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="bg-[#1a56db] text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <span className="text-lg leading-none">+</span> Nuevo registro
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
+            <span className="text-3xl font-medium text-blue-600">{mantenimientos.length}</span>
+            <span className="text-sm text-gray-500 mt-2">Servicios registrados</span>
+          </div>
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
+            <span className="text-3xl font-medium text-green-600">{totalCompletados}</span>
+            <span className="text-sm text-gray-500 mt-2">Completados</span>
+          </div>
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
+            <span className="text-3xl font-medium text-orange-500">{totalEnProceso}</span>
+            <span className="text-sm text-gray-500 mt-2">En proceso</span>
+          </div>
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
+            <span className="text-3xl font-medium text-blue-600">${ingresosTotales.toLocaleString()}</span>
+            <span className="text-sm text-gray-500 mt-2">Ingresos totales</span>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {mantenimientos.map(m => (
+            <div key={m.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-left">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                <div className="flex gap-4">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{m.servicioBase}</h3>
+                    <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                      {m.vehiculo}
+                      <span className="text-gray-300">•</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      {m.fecha}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-gray-900 mb-1">${m.precioTotal.toLocaleString()}</div>
+                  <span className={`px-2.5 py-1 rounded text-xs font-semibold ${m.estado === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {m.estado}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6 bg-gray-50/50 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Información del vehículo</h4>
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <p><span className="font-medium">Propietario:</span> {m.propietario}</p>
+                    <p><span className="font-medium">Kilometraje:</span> {m.kilometraje}</p>
+                    <p><span className="font-medium">Técnico:</span> {m.tecnico}</p>
+                  </div>
+
+                  {m.partes.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Partes utilizadas</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {m.partes.map((p, i) => (
+                          <span key={i} className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs items-center justify-center">
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Observaciones</h4>
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {m.observaciones}
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-gray-100 flex gap-3">
+                <button className="bg-[#1a56db] text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-blue-800 transition">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Descargar PDF
+                </button>
+                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-200 transition">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  Editar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col my-8 max-h-[90vh]">
+
+            <div className="flex justify-between items-center p-6 border-b border-gray-100 shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Nueva Orden de Mantenimiento</h2>
+                <p className="text-sm text-gray-500 mt-1">Registra todos los detalles del servicio</p>
+              </div>
+              <button type="button" onClick={cerrarModal} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 text-left space-y-6">
+              <form id="mantenimientoForm" onSubmit={manejarEnvio}>
+
+                <div className="bg-blue-50/30 border border-blue-50 rounded-xl p-6 mb-6">
+                  <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                    Información del Vehículo
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Seleccionar Vehículo *</label>
+                      <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={nuevo.vehiculo} onChange={e => setNuevo({ ...nuevo, vehiculo: e.target.value })}>
+                        <option value="">-- Selecciona un vehículo --</option>
+                        {vehiculosMock.map(v => <option key={v.id} value={v.nombre}>{v.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Kilometraje Actual *</label>
+                      <input required type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={nuevo.kilometraje} onChange={e => setNuevo({ ...nuevo, kilometraje: e.target.value })} placeholder="Ej: 45,230 km" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-gray-100 rounded-xl p-6 mb-6 shadow-sm">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4">
+                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    Información del Servicio
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Fecha del Servicio *</label>
+                      <input required type="date" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={nuevo.fecha} onChange={e => setNuevo({ ...nuevo, fecha: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Técnico Responsable *</label>
+                      <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={nuevo.tecnico} onChange={e => setNuevo({ ...nuevo, tecnico: e.target.value })}>
+                        <option value="">-- Selecciona un técnico --</option>
+                        {tecnicosMock.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Estado</label>
+                      <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        value={nuevo.estado} onChange={e => setNuevo({ ...nuevo, estado: e.target.value })}>
+                        <option value="En proceso">En proceso</option>
+                        <option value="Completado">Completado</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50/50 border border-green-100 rounded-xl p-6 mb-6">
+                  <h3 className="text-sm font-bold text-green-800 flex items-center gap-2 mb-4">
+                    <span className="font-bold text-lg leading-none text-green-600">$</span>
+                    Trabajos Realizados
+                  </h3>
+
+                  {trabajos.map(t => (
+                    <div key={t.id} className="flex gap-2 mb-3 items-center">
+                      <div className="w-1/3 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{t.nombre}</div>
+                      <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{t.descripcion || '-'}</div>
+                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">${t.precio}</div>
+                      <button type="button" onClick={() => eliminarTrabajo(t.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
+                    <div className="w-full md:w-1/3">
+                      <select className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
+                        value={nuevoTrabajo.servicioId} onChange={handleServicioChange}>
+                        <option value="">Seleccione un servicio predefinido</option>
+                        {serviciosPredefinidos.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex-1 w-full">
+                      <input type="text" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                        value={nuevoTrabajo.descripcion} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, descripcion: e.target.value })} placeholder="Descripción adicional" />
+                    </div>
+                    <div className="w-full md:w-32">
+                      <input type="number" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                        value={nuevoTrabajo.precio} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, precio: e.target.value })} placeholder="Precio" />
+                    </div>
+                    <button type="button" onClick={agregarTrabajo} className="px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-bold whitespace-nowrap">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50/50 border border-yellow-100 rounded-xl p-6 mb-6">
+                  <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2 mb-4">
+                    Partes y Refacciones Utilizadas
+                  </h3>
+
+                  {refacciones.map(r => (
+                    <div key={r.id} className="flex gap-2 mb-3 items-center">
+                      <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{r.nombre}</div>
+                      <div className="w-20 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">{r.cantidad}</div>
+                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">${r.precio}</div>
+                      <button type="button" onClick={() => eliminarRefaccion(r.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  ))}
+
+                  <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
+                    <div className="flex-1 w-full">
+                      <input type="text" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
+                        value={nuevaRefaccion.nombre} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, nombre: e.target.value })} placeholder="Nombre de la parte" />
+                    </div>
+                    <div className="w-full md:w-20">
+                      <input type="number" min="1" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
+                        value={nuevaRefaccion.cantidad} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, cantidad: e.target.value })} placeholder="1" />
+                    </div>
+                    <div className="w-full md:w-32">
+                      <input type="number" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
+                        value={nuevaRefaccion.precio} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, precio: e.target.value })} placeholder="Precio unitario" />
+                    </div>
+                    <button type="button" onClick={agregarRefaccion} className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-bold whitespace-nowrap">
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Observaciones y Notas</label>
+                  <textarea className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" rows="4"
+                    value={nuevo.observaciones} onChange={e => setNuevo({ ...nuevo, observaciones: e.target.value })} placeholder="Escribe cualquier observación importante sobre el trabajo realizado..."></textarea>
+                </div>
+
+                <div className="bg-[#1a56db] rounded-xl p-6 text-white flex justify-between items-center mb-6">
+                  <div>
+                    <div className="text-sm text-blue-200 mb-1">Total del Servicio</div>
+                    <div className="text-3xl font-bold">${calcularTotal().toLocaleString()} MXN</div>
+                  </div>
+                  <div>
+                    <svg className="w-12 h-12 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 shrink-0 bg-white">
+              <button type="button" onClick={cerrarModal} className="px-6 py-2.5 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                Cancelar
+              </button>
+              <button type="submit" form="mantenimientoForm" className="px-6 py-2.5 text-sm font-bold text-white bg-gray-400 hover:bg-blue-600 rounded-lg transition-colors"
+                style={{ backgroundColor: (nuevo.vehiculo && nuevo.fecha && nuevo.tecnico) ? '#1a56db' : '#cbd5e1' }}>
+                Crear Orden
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </AdminLayout>
+  );
+}

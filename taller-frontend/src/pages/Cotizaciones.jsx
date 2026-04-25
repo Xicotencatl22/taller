@@ -56,7 +56,7 @@ export default function Cotizaciones() {
     cliente: '',
     email: '',
     vehiculo: '',
-    servicio: '',
+    servicios: [],
     manoObra: '',
     refacciones: '',
     validaHasta: ''
@@ -79,7 +79,7 @@ export default function Cotizaciones() {
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Cotizaciones</h1>
-            <p className="text-gray-500">Administra las cotizaciones y actualiza precios</p>
+            <p className="text-gray-500">Administra las cotizaciones en el sistema</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -199,11 +199,6 @@ export default function Cotizaciones() {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-auto max-h-[85vh] sticky top-8">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h2 className="text-lg font-bold text-gray-900">Lista de precios</h2>
-                <button className="text-gray-400 hover:text-gray-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                  </svg>
-                </button>
               </div>
 
               <div className="p-6 space-y-6 overflow-y-auto flex-1">
@@ -226,11 +221,6 @@ export default function Cotizaciones() {
                 ))}
               </div>
 
-              <div className="p-6 border-t border-gray-100">
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg text-sm font-bold transition-colors">
-                  Actualizar precios
-                </button>
-              </div>
             </div>
           </div>
 
@@ -285,11 +275,43 @@ export default function Cotizaciones() {
                       <input type="text" placeholder="Toyota Corolla 2020" className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicio *</label>
-                      <select className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                        <option>Seleccionar servicio</option>
-                        {listaPrecios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-                      </select>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicios *</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                        {listaPrecios.map(s => {
+                          const isSelected = newQuoteForm.servicios?.includes(s.id);
+                          return (
+                            <label key={s.id} className={`flex items-start gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                              <input 
+                                type="checkbox" 
+                                className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                                checked={isSelected || false}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setNewQuoteForm(prev => {
+                                    const current = prev.servicios || [];
+                                    const newServicios = checked ? [...current, s.id] : current.filter(id => id !== s.id);
+                                    
+                                    const selectedItems = listaPrecios.filter(item => newServicios.includes(item.id));
+                                    const totalManoObra = selectedItems.reduce((acc, item) => acc + item.manoObra, 0);
+                                    const totalRefacciones = selectedItems.reduce((acc, item) => acc + item.refacciones, 0);
+
+                                    return {
+                                      ...prev,
+                                      servicios: newServicios,
+                                      manoObra: totalManoObra || '',
+                                      refacciones: totalRefacciones || ''
+                                    };
+                                  });
+                                }}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-800 leading-tight">{s.nombre}</span>
+                                <span className="text-xs text-gray-500 mt-1">${s.total}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

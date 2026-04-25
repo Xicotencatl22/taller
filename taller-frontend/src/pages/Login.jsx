@@ -61,7 +61,13 @@ function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left side with blue background */}
-      <div className="hidden md:flex md:w-1/2 bg-blue-950 flex-col justify-between p-12">
+      <div className="hidden md:flex md:w-1/2 flex-col justify-between p-12"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(10,24,60,0.75), rgba(10,24,60,0.75)),url("/src/assets/f1.jpeg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}>
         <div>
           <h2 className="text-white text-2xl font-bold mb-2">San Jorge</h2>
           <p className="text-blue-200">Autoservicio</p>

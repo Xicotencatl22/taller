@@ -25,55 +25,48 @@ export default function AdminCitas() {
   const [citas, setCitas] = useState([]);
 
   useEffect(() => {
-    const savedCitas = localStorage.getItem('adminCitas');
-    if (savedCitas) {
-      setCitas(JSON.parse(savedCitas));
-    } else {
-      // Seed initial mock data
-      const mockCitas = [
-        {
-          id: 1,
-          cliente: 'María González',
-          email: 'maria@email.com',
-          telefono: '123-456-7890',
-          vehiculo: 'Toyota Corolla 2020',
-          servicio: 'Afinación básica',
-          fecha: '19/3/2026',
-          hora: '10:00 AM',
-          costo: 1540,
-          estado: 'Confirmada',
-          avatar: 'M'
-        },
-        {
-          id: 2,
-          cliente: 'Pedro Martínez',
-          email: 'pedro@email.com',
-          telefono: '123-456-7891',
-          vehiculo: 'Honda Civic 2019',
-          servicio: 'Cambio de aceite y filtro',
-          fecha: '20/3/2026',
-          hora: '2:00 PM',
-          costo: 850,
-          estado: 'Pendiente',
-          avatar: 'P'
-        },
-        {
-          id: 3,
-          cliente: 'Ana López',
-          email: 'ana@email.com',
-          telefono: '123-456-7892',
-          vehiculo: 'Nissan Sentra 2021',
-          servicio: 'Servicio de frenos básico',
-          fecha: '21/3/2026',
-          hora: '9:00 AM',
-          costo: 1800,
-          estado: 'Confirmada',
-          avatar: 'A'
-        }
-      ];
-      localStorage.setItem('adminCitas', JSON.stringify(mockCitas));
-      setCitas(mockCitas);
-    }
+    const mockCitas = [
+      {
+        id: 1,
+        cliente: 'María González',
+        email: 'maria@email.com',
+        telefono: '123-456-7890',
+        vehiculo: 'Toyota Corolla 2020',
+        servicio: 'Afinación básica',
+        fecha: '19/3/2026',
+        hora: '10:00 AM',
+        costo: 1540,
+        estado: 'Confirmada',
+        avatar: 'M'
+      },
+      {
+        id: 2,
+        cliente: 'Pedro Martínez',
+        email: 'pedro@email.com',
+        telefono: '123-456-7891',
+        vehiculo: 'Honda Civic 2019',
+        servicio: 'Cambio de aceite y filtro',
+        fecha: '20/3/2026',
+        hora: '2:00 PM',
+        costo: 850,
+        estado: 'Pendiente',
+        avatar: 'P'
+      },
+      {
+        id: 3,
+        cliente: 'Ana López',
+        email: 'ana@email.com',
+        telefono: '123-456-7892',
+        vehiculo: 'Nissan Sentra 2021',
+        servicio: 'Servicio de frenos básico',
+        fecha: '21/3/2026',
+        hora: '9:00 AM',
+        costo: 1800,
+        estado: 'Confirmada',
+        avatar: 'A'
+      }
+    ];
+    setCitas(mockCitas);
   }, []);
 
   // Modal State
@@ -87,7 +80,7 @@ export default function AdminCitas() {
     modelo: '',
     ano: '',
     placa: '',
-    servicio: '',
+    servicios: [],
     notas: ''
   });
 
@@ -372,12 +365,36 @@ export default function AdminCitas() {
                     </div>
                     
                     <div className="mb-4">
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicio solicitado *</label>
-                      <select value={formData.servicio} onChange={e=>setFormData({...formData, servicio: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                        <option value="">Seleccionar servicio</option>
-                        <option value="Afinación básica">Afinación básica</option>
-                        <option value="Servicio de frenos plus">Servicio de frenos plus</option>
-                      </select>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicios solicitados *</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                        {[
+                          'Cambio de aceite y filtro',
+                          'Afinación básica',
+                          'Afinación integral',
+                          'Servicio de frenos básico',
+                          'Servicio de frenos plus'
+                        ].map((s, idx) => {
+                          const isSelected = formData.servicios?.includes(s);
+                          return (
+                            <label key={idx} className={`flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                              <input 
+                                type="checkbox" 
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                checked={isSelected || false}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setFormData(prev => {
+                                    const current = prev.servicios || [];
+                                    const newServicios = checked ? [...current, s] : current.filter(item => item !== s);
+                                    return { ...prev, servicios: newServicios };
+                                  });
+                                }}
+                              />
+                              <span className="text-sm font-medium text-gray-800">{s}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
@@ -425,9 +442,13 @@ export default function AdminCitas() {
                     </div>
 
                     <div className="pb-4 mb-4 border-b border-gray-200">
-                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Servicio</div>
+                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Servicios</div>
                       <div className="text-sm font-semibold text-gray-900">
-                        {formData.servicio || 'No especificado'}
+                        {formData.servicios && formData.servicios.length > 0 ? (
+                          <ul className="list-disc pl-4 space-y-1">
+                            {formData.servicios.map((s, i) => <li key={i}>{s}</li>)}
+                          </ul>
+                        ) : 'No especificado'}
                       </div>
                     </div>
 

@@ -8,7 +8,7 @@ export default function Productos() {
     { id: 3, nombre: "Balatas Delanteras Mazda 3", categoria: "Frenos", precio: 850, stock: 4, sku: "BAL-FRE-003", minStock: 10, costo: 600, proovedor: "AutoPartes del Norte", ubicacion: "Estante C-2" }
   ]);
 
-  const [nuevo, setNuevo] = useState({ id: null, nombre: '', categoria: '', precio: '', stock: '', sku: '', minStock: '', costo: '', ubicacion: '' });
+  const [nuevo, setNuevo] = useState({ id: null, nombre: '', categoria: '', precio: '', stock: 0, sku: '', minStock: '', costo: '', ubicacion: '' });
   const [editando, setEditando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -24,6 +24,7 @@ export default function Productos() {
       setProductos([...productos, {
         ...nuevo,
         id: Date.now(),
+        stock: 0,
         sku: nuevo.sku || 'NVO-000',
         minStock: nuevo.minStock || 10,
         costo: nuevo.costo || nuevo.precio * 0.7,
@@ -31,7 +32,7 @@ export default function Productos() {
         ubicacion: nuevo.ubicacion || 'Pendiente'
       }]);
     }
-    setNuevo({ id: null, nombre: '', categoria: '', precio: '', stock: '', sku: '', minStock: '', costo: '', ubicacion: '' });
+    setNuevo({ id: null, nombre: '', categoria: '', precio: '', stock: 0, sku: '', minStock: '', costo: '', ubicacion: '' });
     setShowModal(false);
   };
 
@@ -54,7 +55,7 @@ export default function Productos() {
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Gestión de Productos</h2>
             <p className="text-gray-500 text-sm">Administra el inventario y control de stock</p>
           </div>
-          <button type="button" onClick={() => { setShowModal(true); setEditando(false); setNuevo({ id: null, nombre: '', categoria: '', precio: '', stock: '', sku: '', minStock: '', costo: '', ubicacion: '' }); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition">
+          <button type="button" onClick={() => { setShowModal(true); setEditando(false); setNuevo({ id: null, nombre: '', categoria: '', precio: '', stock: 0, sku: '', minStock: '', costo: '', ubicacion: '' }); }} className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition">
             + Agregar producto
           </button>
         </div>
@@ -141,7 +142,7 @@ export default function Productos() {
                     <div className="text-sm text-gray-900 mt-1">{p.minStock}</div>
                   </div>
                   <div>
-                    <div className="text-[11px] text-gray-500 mb-1 font-medium text-left">Costo unitario</div>
+                    <div className="text-[11px] text-gray-500 mb-1 font-medium text-left">Costo de compra</div>
                     <div className="text-sm text-gray-900 mt-1">${p.costo}</div>
                   </div>
                   <div>
@@ -241,23 +242,33 @@ export default function Productos() {
                 </div>
 
                 {/* Row 3 */}
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock inicial <span className="text-red-500">*</span></label>
-                    <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
-                      value={nuevo.stock} onChange={e => setNuevo({ ...nuevo, stock: e.target.value })} placeholder="24" />
+                {editando && (
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock <span className="text-red-500">*</span></label>
+                      <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
+                        value={nuevo.stock} onChange={e => setNuevo({ ...nuevo, stock: e.target.value })} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock mínimo <span className="text-red-500">*</span></label>
+                      <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
+                        value={nuevo.minStock} onChange={e => setNuevo({ ...nuevo, minStock: e.target.value })} placeholder="10" />
+                    </div>
                   </div>
+                )}
+                {!editando && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock mínimo <span className="text-red-500">*</span></label>
                     <input type="number" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
                       value={nuevo.minStock} onChange={e => setNuevo({ ...nuevo, minStock: e.target.value })} placeholder="10" />
+                    <p className="text-xs text-gray-500 mt-2">El stock inicial se asigna automáticamente en 0 y no puede ingresarse manualmente.</p>
                   </div>
-                </div>
+                )}
 
                 {/* Row 4 */}
                 <div className="grid grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo unitario (MXN) <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Costo de compra (MXN) <span className="text-red-500">*</span></label>
                     <input type="number" step="0.01" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
                       value={nuevo.costo} onChange={e => setNuevo({ ...nuevo, costo: e.target.value })} placeholder="180.00" />
                   </div>

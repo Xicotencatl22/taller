@@ -27,7 +27,7 @@ function FormularioCarro() {
     apellido: "",
     correo: "",
     telefono: "",
-    servicio: location.state?.servicio || "",
+    servicios: location.state?.servicio ? [location.state?.servicio] : [],
     kilometraje: "",
     idmarca: "",
     idmodelo: "",
@@ -61,26 +61,10 @@ function FormularioCarro() {
   };
 
   const handleConfirmarCita = () => {
-    const existingCitas = JSON.parse(localStorage.getItem('adminCitas') || '[]');
     const marcaObj = fallbackMarcas.find(m => m.idmarca === form.idmarca);
     const modeloObj = (fallbackModelos[form.idmarca] || []).find(m => m.idmodelo === form.idmodelo);
     const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${form.idanio}`.trim();
 
-    const newCita = {
-      id: Date.now(),
-      cliente: contactoForm.nombre || 'Cliente Anónimo',
-      email: contactoForm.correo || 'N/A',
-      telefono: contactoForm.telefono || 'N/A',
-      vehiculo: vehiculoText || 'Vehículo sin especificar',
-      servicio: form.servicio || 'Servicio General',
-      fecha: `${selectedFecha.dia}/${selectedFecha.mes}/2026`,
-      hora: selectedHora,
-      costo: 1540,
-      estado: 'Pendiente',
-      avatar: contactoForm.nombre ? contactoForm.nombre.charAt(0).toUpperCase() : 'C'
-    };
-
-    localStorage.setItem('adminCitas', JSON.stringify([...existingCitas, newCita]));
     alert("¡Tu cita se ha confirmado exitosamente! Hemos notificado al administrador.");
     closeAndResetModal();
     navigate('/');
@@ -201,17 +185,38 @@ function FormularioCarro() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             
-            {/* Servicio (Solo lectura) */}
+            {/* Servicios */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Servicio</label>
-              <input
-                type="text"
-                name="servicio"
-                value={form.servicio}
-                readOnly
-                className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
-                placeholder="Servicio seleccionado"
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Servicios solicitados</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                {[
+                  'Cambio de aceite y filtro',
+                  'Afinación básica',
+                  'Afinación integral',
+                  'Servicio de frenos básico',
+                  'Servicio de frenos plus'
+                ].map((s, idx) => {
+                  const isSelected = form.servicios?.includes(s);
+                  return (
+                    <label key={idx} className={`flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50 bg-white'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="rounded text-blue-600 focus:ring-blue-500"
+                        checked={isSelected || false}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setForm(prev => {
+                            const current = prev.servicios || [];
+                            const newServicios = checked ? [...current, s] : current.filter(item => item !== s);
+                            return { ...prev, servicios: newServicios };
+                          });
+                        }}
+                      />
+                      <span className="text-sm font-medium text-gray-800">{s}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Año y Marca */}
@@ -337,9 +342,11 @@ function FormularioCarro() {
             </p>
 
             <div className="flex flex-col gap-4 text-sm text-gray-600 mb-10">
-              <div className="flex justify-between">
-                <span>Servicio</span>
-                <span className="font-semibold text-gray-900">{form.servicio || 'Afinación básica'}</span>
+              <div className="flex justify-between items-start gap-4">
+                <span>Servicios</span>
+                <span className="font-semibold text-gray-900 text-right">
+                  {form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio General'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Tiempo estimado</span>
@@ -406,7 +413,7 @@ function FormularioCarro() {
               </button>
               
               <h2 className="text-xl font-bold text-gray-900 mb-1">Agendar servicio</h2>
-              <p className="text-sm text-gray-500 mb-6">{form.servicio || 'Servicio seleccionado'}</p>
+              <p className="text-sm text-gray-500 mb-6 max-w-lg">{form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio seleccionado'}</p>
               
               {/* Stepper */}
               <div className="flex justify-center items-center max-w-xl mx-auto">
@@ -525,9 +532,15 @@ function FormularioCarro() {
                   <div className="w-full bg-white rounded-xl border border-gray-200 overflow-hidden text-left mb-6 shadow-sm">
                     
                     <div className="p-5 border-b border-gray-100">
-                      <div className="text-sm font-medium text-gray-500 mb-1">Servicio</div>
-                      <div className="text-base font-semibold text-gray-900">{form.servicio || 'Servicio General'}</div>
-                      <div className="text-sm text-blue-600 mt-1">Costo estimado: $1540 MXN</div>
+                      <div className="text-sm font-medium text-gray-500 mb-2">Servicios</div>
+                      <div className="text-base font-semibold text-gray-900">
+                        {form.servicios?.length > 0 ? (
+                          <ul className="list-disc pl-5 space-y-1">
+                            {form.servicios.map((s, idx) => <li key={idx}>{s}</li>)}
+                          </ul>
+                        ) : 'Servicio General'}
+                      </div>
+                      <div className="text-sm text-blue-600 mt-3">Costo estimado: $1540 MXN</div>
                     </div>
 
                     <div className="p-5 border-b border-gray-100">
