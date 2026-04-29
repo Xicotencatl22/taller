@@ -2,10 +2,12 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
+const PERMISSIONS = ['Dashboard', 'Citas', 'Vehículos', 'Servicios', 'Productos', 'Ventas', 'Compras', 'Cotizaciones', 'Reportes', 'Usuarios', 'Roles'];
+
 function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, roles, saveRole, deleteRole, users, saveUser, deleteUser } = useContext(AuthContext);
+  const { roles, users, saveRole, deleteRole, saveUser, deleteUser, fetchUsers } = useContext(AuthContext);
 
   const [tab, setTab] = useState(location.state?.tab || 'dashboard');
 
@@ -14,7 +16,7 @@ function AdminDashboard() {
       setTab(location.state.tab);
     }
   }, [location.state?.tab]);
-  
+
   // User modal and search
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [userSearch, setUserSearch] = useState('');
@@ -25,6 +27,9 @@ function AdminDashboard() {
   const [userPassword, setUserPassword] = useState('');
   const [userRole, setUserRole] = useState('Cliente');
   const [userError, setUserError] = useState('');
+  const [userNameError, setUserNameError] = useState('');
+  const [userEmailError, setUserEmailError] = useState('');
+  const [userPasswordError, setUserPasswordError] = useState('');
 
   // Role modal and filters
   const [roleModalOpen, setRoleModalOpen] = useState(false);
@@ -34,10 +39,58 @@ function AdminDashboard() {
   const [roleColor, setRoleColor] = useState('#A78BFA');
   const [rolePermissions, setRolePermissions] = useState([]);
   const [roleError, setRoleError] = useState('');
+  const [roleNameError, setRoleNameError] = useState('');
+  const [roleDescriptionError, setRoleDescriptionError] = useState('');
 
-  const PERMISSIONS = ['Dashboard','Citas','Vehículos','Servicios','Productos','Ventas','Compras','Cotizaciones','Reportes','Usuarios','Roles'];
+  const PERMISSIONS = ['Dashboard', 'Citas', 'Vehículos', 'Servicios', 'Productos', 'Ventas', 'Compras', 'Cotizaciones', 'Reportes', 'Usuarios', 'Roles'];
 
+  useEffect(() => {
+    if (fetchUsers) {
+      fetchUsers();
+    }
+  }, [fetchUsers]);
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const validateUserNameField = () => {
+    const message = userName.trim() ? '' : 'El nombre completo es obligatorio.';
+    setUserNameError(message);
+    return !message;
+  };
+
+  const validateUserEmailField = () => {
+    const message = userEmail
+      ? emailRegex.test(userEmail) && userEmail.length < 64
+        ? ''
+        : 'Email inválido o demasiado largo.'
+      : 'El correo electrónico es obligatorio.';
+    setUserEmailError(message);
+    return !message;
+  };
+
+  const validateUserPasswordField = () => {
+    const message = userPassword
+      ? userPassword.length > 6 && /\d/.test(userPassword)
+        ? ''
+        : 'Contraseña debe tener más de 6 caracteres e incluir números.'
+      : editingUserId
+        ? ''
+        : 'La contraseña es obligatoria.';
+    setUserPasswordError(message);
+    return !message;
+  };
+
+  const validateRoleNameField = () => {
+    const message = roleName.trim() ? '' : 'El nombre del rol es obligatorio.';
+    setRoleNameError(message);
+    return !message;
+  };
+
+  const validateRoleDescriptionField = () => {
+    const message = roleDescription.trim() ? '' : 'La descripción del rol es obligatoria.';
+    setRoleDescriptionError(message);
+    return !message;
+  };
 
   const counts = useMemo(() => {
     const totalUsers = users.length;
@@ -47,41 +100,45 @@ function AdminDashboard() {
     return { totalUsers, adminCount, tecnicoCount, clientCount };
   }, [users]);
 
-  const handleUserSubmit = (e) => {
+  const handleUserSubmit = async (e) => {
     e.preventDefault();
     setUserError('');
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!userName || !userEmail || !userPassword || !userRole) {
-      setUserError('Completa todos los campos de usuario.');
-      return;
-    }
-    if (userEmail.length >= 64 || !emailRegex.test(userEmail)) {
-      setUserError('Email inválido o demasiado largo.');
-      return;
-    }
-    if (userPassword.length <= 6 || !/\d/.test(userPassword)) {
-      setUserError('Contraseña debe tener más de 6 caracteres e incluir números.');
+    const isNameValid = validateUserNameField();
+    const isEmailValid = validateUserEmailField();
+    const isPasswordValid = validateUserPasswordField();
+
+    if (!isNameValid || !isEmailValid || !isPasswordValid || !userRole) {
+      setUserError('Corrige los errores de usuario antes de continuar.');
       return;
     }
 
     if (editingUserId) {
-      // Update existing user
-      const result = saveUser({ id: editingUserId, name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
+      const updatedFields = {
+        id: editingUserId,
+        name: userName,
+        email: userEmail,
+        role: userRole,
+        phone: userPhone,
+      };
+      if (userPassword) {
+        updatedFields.password = userPassword;
+      }
+      const result = await saveUser(updatedFields);
       if (!result.success) {
-        setUserError(result.error);
+        setUserError(result.error || 'No se pudo actualizar el usuario.');
         return;
       }
       setEditingUserId(null);
     } else {
-      // Create new user
       if (users.some((u) => u.email === userEmail)) {
         setUserError('Ya existe un usuario con ese correo.');
         return;
       }
-      const result = saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
+      const result = await saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
       if (!result.success) {
         setUserError(result.error || 'No se pudo crear usuario.');
+        return;
         return;
       }
     }
@@ -100,7 +157,7 @@ function AdminDashboard() {
       setUserName(user.name);
       setUserEmail(user.email);
       setUserPhone(user.phone || '');
-      setUserPassword(user.password);
+      setUserPassword('');
       setUserRole(user.role);
     } else {
       setEditingUserId(null);
@@ -111,6 +168,9 @@ function AdminDashboard() {
       setUserRole('Cliente');
     }
     setUserError('');
+    setUserNameError('');
+    setUserEmailError('');
+    setUserPasswordError('');
     setUserModalOpen(true);
   };
 
@@ -119,31 +179,35 @@ function AdminDashboard() {
     setEditingUserId(null);
   };
 
-  const handleRoleSubmit = (e) => {
+  const handleRoleSubmit = async (e) => {
     e.preventDefault();
     setRoleError('');
-    if (!roleName || !roleDescription) {
-      setRoleError('Completa el nombre y la descripción del rol.');
+
+    const isNameValid = validateRoleNameField();
+    const isDescriptionValid = validateRoleDescriptionField();
+
+    if (!isNameValid || !isDescriptionValid) {
+      setRoleError('Corrige los errores del rol antes de continuar.');
       return;
     }
 
+    const roleData = {
+      name: roleName,
+      description: roleDescription,
+      color: roleColor,
+      permissions: rolePermissions,
+    };
+
     if (editingRoleId) {
-      const result = saveRole({ id: editingRoleId, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions });
-      if (!result.success) {
-        setRoleError(result.error);
-        return;
-      }
-      setEditingRoleId(null);
-    } else {
-      // Create new role
-      const roleId = roleName.trim().toLowerCase().replace(/\s+/g, '_');
-      const result = saveRole({ id: roleId, name: roleName, description: roleDescription, color: roleColor, permissions: rolePermissions });
-      if (!result.success) {
-        setRoleError(result.error || 'No se pudo crear rol.');
-        return;
-      }
+      roleData.id = editingRoleId;
     }
 
+    const result = await saveRole(roleData);
+    if (!result.success) {
+      setRoleError(result.error || 'No se pudo guardar el rol.');
+      return;
+    }
+    setEditingRoleId(null);
     setRoleModalOpen(false);
     setRoleName('');
     setRoleDescription('');
@@ -166,6 +230,8 @@ function AdminDashboard() {
       setRolePermissions([]);
     }
     setRoleError('');
+    setRoleNameError('');
+    setRoleDescriptionError('');
     setRoleModalOpen(true);
   };
 
@@ -178,10 +244,12 @@ function AdminDashboard() {
     setRolePermissions((prev) => (prev.includes(perm) ? prev.filter((r) => r !== perm) : [...prev, perm]));
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
     if (window.confirm('¿Eliminar este usuario?')) {
-      deleteUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      const result = await deleteUser(id);
+      if (!result.success) {
+        alert(result.error || 'No se pudo eliminar el usuario.');
+      }
     }
   };
 
@@ -208,11 +276,11 @@ function AdminDashboard() {
     const usersWithRoles = users.filter(u => roles.some(r => r.name === u.role)).length;
     const totalPermissions = PERMISSIONS.length;
     return { totalRoles, adminRoles, usersWithRoles, totalPermissions };
-  }, [roles, users]);
+  }, [roles, users, PERMISSIONS.length]);
 
   return (
     <div className="flex h-screen bg-gray-50 text-left overflow-hidden">
-      
+
       {/* Sidebar */}
       <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
         <div className="p-6 flex items-center gap-3">
@@ -250,36 +318,36 @@ function AdminDashboard() {
             { icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z', label: 'Usuarios', id: 'usuarios' },
             { icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z', label: 'Roles', id: 'roles' },
           ].map((item, i) => (
-             <button key={i} onClick={() => {
-                if (['citas', 'productos', 'compras', 'cotizaciones', 'reportes', 'vehiculos', 'servicios', 'ventas'].includes(item.id)) {
-                  navigate(`/admin/${item.id}`);
-                } else {
-                  setTab(item.id);
-                }
-             }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${tab === item.id ? 'bg-blue-600 text-white' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}>
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 opacity-70">
-                 <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-               </svg>
-               {item.label}
-             </button>
+            <button key={i} onClick={() => {
+              if (['citas', 'productos', 'compras', 'cotizaciones', 'reportes', 'vehiculos', 'servicios', 'ventas'].includes(item.id)) {
+                navigate(`/admin/${item.id}`);
+              } else {
+                setTab(item.id);
+              }
+            }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${tab === item.id ? 'bg-blue-600 text-white' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 opacity-70">
+                <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+              </svg>
+              {item.label}
+            </button>
           ))}
         </nav>
 
         <div className="p-4 mt-auto">
-           <button 
-             onClick={() => navigate('/login')}
-             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-200 hover:bg-red-800/50 hover:text-white font-medium text-sm transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-              </svg>
-              Cerrar sesión
-           </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-200 hover:bg-red-800/50 hover:text-white font-medium text-sm transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50">
-        
+
         {/* Top Navbar */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
           <button className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
@@ -303,112 +371,112 @@ function AdminDashboard() {
 
               {/* Tarjetas Superiores */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Inventario</span>
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
-                </div>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">$5354</div>
-              <div className="text-xs text-gray-400">Total en productos</div>
-            </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Ventas</span>
-                <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Inventario</span>
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">$5354</div>
+                  <div className="text-xs text-gray-400">Total en productos</div>
                 </div>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">$1,318</div>
-              <div className="text-xs font-medium text-green-500">+282% vs mes anterior</div>
-            </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Compras</span>
-                <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" /></svg>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Ventas</span>
+                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">$1,318</div>
+                  <div className="text-xs font-medium text-green-500">+282% vs mes anterior</div>
                 </div>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
-              <div className="text-xs text-gray-400">Este mes</div>
-            </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingresos Taller</span>
-                <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center text-yellow-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17l-1.39-1.39m0 0l-3.9 3.9a2.38 2.38 0 01-3.32-3.32l3.9-3.9m0 0l-1.39-1.39m1.39 1.39L6.5 4.67M2.38 2.38a2.38 2.38 0 013.32 0l7.52 7.52m0 0l1.39-1.39" /></svg>
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Compras</span>
+                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" /></svg>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
+                  <div className="text-xs text-gray-400">Este mes</div>
                 </div>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
-              <div className="text-xs text-gray-400">Servicios realizados</div>
-            </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingresos Taller</span>
+                    <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center text-yellow-600">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17l-1.39-1.39m0 0l-3.9 3.9a2.38 2.38 0 01-3.32-3.32l3.9-3.9m0 0l-1.39-1.39m1.39 1.39L6.5 4.67M2.38 2.38a2.38 2.38 0 013.32 0l7.52 7.52m0 0l1.39-1.39" /></svg>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
+                  <div className="text-xs text-gray-400">Servicios realizados</div>
+                </div>
 
               </div>
 
               <div className="flex flex-col lg:flex-row gap-6">
-                
+
                 {/* Gráfica */}
                 <div className="flex-[2] bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-6">Ventas por Mes (últimos 6 meses)</h3>
-              <div className="flex gap-2 mb-8">
-                <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium">Ventas</button>
-                <button className="text-gray-500 hover:bg-gray-50 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">Inventario</button>
-                <button className="text-gray-500 hover:bg-gray-50 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">Servicios</button>
-              </div>
-              
-              {/* Fake Chart */}
-              <div className="h-64 flex items-end justify-between px-2 gap-4 relative">
-                {/* Y-axis labels */}
-                <div className="absolute left-0 top-0 bottom-0 w-8 flex flex-col justify-between text-xs text-gray-400 font-medium">
-                  <span>800</span>
-                  <span>600</span>
-                  <span>400</span>
-                  <span>200</span>
-                  <span>0</span>
-                </div>
-                {/* Horizontal lines */}
-                <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between">
-                  <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
-                  <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
-                  <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
-                  <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
-                  <div className="border-b border-gray-200 w-full h-[1px]"></div>
-                </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-6">Ventas por Mes (últimos 6 meses)</h3>
+                  <div className="flex gap-2 mb-8">
+                    <button className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium">Ventas</button>
+                    <button className="text-gray-500 hover:bg-gray-50 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">Inventario</button>
+                    <button className="text-gray-500 hover:bg-gray-50 px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">Servicios</button>
+                  </div>
 
-                {/* Bars */}
-                <div className="ml-10 flex-1 flex items-end justify-between px-2 z-10 gap-2">
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '15%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Oct 25</span>
-                  </div>
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '10%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Nov 25</span>
-                  </div>
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '20%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Dic 25</span>
-                  </div>
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '12%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Ene 26</span>
-                  </div>
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '25%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Feb 26</span>
-                  </div>
-                  <div className="w-full flex-col flex items-center gap-2">
-                    <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{height: '85%'}}></div>
-                    <span className="text-xs text-gray-500 font-medium">Mar 26</span>
+                  {/* Fake Chart */}
+                  <div className="h-64 flex items-end justify-between px-2 gap-4 relative">
+                    {/* Y-axis labels */}
+                    <div className="absolute left-0 top-0 bottom-0 w-8 flex flex-col justify-between text-xs text-gray-400 font-medium">
+                      <span>800</span>
+                      <span>600</span>
+                      <span>400</span>
+                      <span>200</span>
+                      <span>0</span>
+                    </div>
+                    {/* Horizontal lines */}
+                    <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between">
+                      <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
+                      <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
+                      <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
+                      <div className="border-b border-gray-100 border-dashed w-full h-[1px]"></div>
+                      <div className="border-b border-gray-200 w-full h-[1px]"></div>
+                    </div>
+
+                    {/* Bars */}
+                    <div className="ml-10 flex-1 flex items-end justify-between px-2 z-10 gap-2">
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '15%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Oct 25</span>
+                      </div>
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '10%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Nov 25</span>
+                      </div>
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '20%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Dic 25</span>
+                      </div>
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '12%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Ene 26</span>
+                      </div>
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '25%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Feb 26</span>
+                      </div>
+                      <div className="w-full flex-col flex items-center gap-2">
+                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '85%' }}></div>
+                        <span className="text-xs text-gray-500 font-medium">Mar 26</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
                 {/* Resumen rápido */}
                 <div className="flex-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
@@ -434,8 +502,8 @@ function AdminDashboard() {
                 </div>
 
               </div>
-              </>
-              )}
+            </>
+          )}
 
           {tab === 'usuarios' && (
             <div>
@@ -534,14 +602,36 @@ function AdminDashboard() {
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" /></svg>
                           Nombre completo *
                         </label>
-                        <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Juan Pérez García" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="text"
+                          value={userName}
+                          onChange={(e) => {
+                            setUserName(e.target.value);
+                            if (userNameError) setUserNameError('');
+                          }}
+                          onBlur={validateUserNameField}
+                          placeholder="Juan Pérez García"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userNameError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userNameError && <p className="mt-2 text-sm text-red-600">{userNameError}</p>}
                       </div>
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
                           Correo electrónico *
                         </label>
-                        <input type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="juan@email.com" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="email"
+                          value={userEmail}
+                          onChange={(e) => {
+                            setUserEmail(e.target.value);
+                            if (userEmailError) setUserEmailError('');
+                          }}
+                          onBlur={validateUserEmailField}
+                          placeholder="juan@email.com"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userEmailError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userEmailError && <p className="mt-2 text-sm text-red-600">{userEmailError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Teléfono (opcional)</label>
@@ -549,7 +639,18 @@ function AdminDashboard() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Contraseña *</label>
-                        <input type="password" value={userPassword} onChange={(e) => setUserPassword(e.target.value)} placeholder="Mín. 6 caracteres con números" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="password"
+                          value={userPassword}
+                          onChange={(e) => {
+                            setUserPassword(e.target.value);
+                            if (userPasswordError) setUserPasswordError('');
+                          }}
+                          onBlur={validateUserPasswordField}
+                          placeholder="Mín. 6 caracteres con números"
+                          className={`w-full p-2.5 rounded-lg text-sm ${userPasswordError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userPasswordError && <p className="mt-2 text-sm text-red-600">{userPasswordError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Seleccionar rol *</label>
@@ -651,11 +752,33 @@ function AdminDashboard() {
                     <form onSubmit={handleRoleSubmit} className="space-y-4">
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Nombre del rol *</label>
-                        <input type="text" value={roleName} onChange={(e) => setRoleName(e.target.value)} placeholder="Ej: Gerente, Vendedor..." className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="text"
+                          value={roleName}
+                          onChange={(e) => {
+                            setRoleName(e.target.value);
+                            if (roleNameError) setRoleNameError('');
+                          }}
+                          onBlur={validateRoleNameField}
+                          placeholder="Ej: Gerente, Vendedor..."
+                          className={`w-full p-2.5 rounded-lg text-sm ${roleNameError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {roleNameError && <p className="mt-2 text-sm text-red-600">{roleNameError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Descripción *</label>
-                        <textarea value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} placeholder="Breve descripción del rol..." className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" rows="2"></textarea>
+                        <textarea
+                          value={roleDescription}
+                          onChange={(e) => {
+                            setRoleDescription(e.target.value);
+                            if (roleDescriptionError) setRoleDescriptionError('');
+                          }}
+                          onBlur={validateRoleDescriptionField}
+                          placeholder="Breve descripción del rol..."
+                          className={`w-full p-2.5 rounded-lg text-sm ${roleDescriptionError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                          rows="2"
+                        ></textarea>
+                        {roleDescriptionError && <p className="mt-2 text-sm text-red-600">{roleDescriptionError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-2">Color</label>

@@ -2,10 +2,8 @@ const pool = require('../db');
 
 const getAllCitas = async (req, res) => {
   try {
-    // PREPARADO: Consultar citas para el panel de admin
-    // const result = await pool.query('SELECT * FROM cita');
-    // res.json(result.rows);
-    res.json({ message: "Obtener todas las citas. Listo para conectar DB." });
+    const result = await pool.query('SELECT idCita AS id, idCotizacion, idUsuarios, fecha, hora, nota FROM Cita');
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -13,14 +11,18 @@ const getAllCitas = async (req, res) => {
 
 const createCita = async (req, res) => {
   try {
-    const { id_cliente, fecha, hora, id_servicio, vehiculo_detalles, observaciones } = req.body;
-    // PREPARADO: Insertar la cita
-    // const result = await pool.query(
-    //   'INSERT INTO cita (id_cliente, fecha, hora, id_servicio, vehiculo_detalles, observaciones, estado) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-    //   [id_cliente, fecha, hora, id_servicio, vehiculo_detalles, observaciones, 'pendiente']
-    // );
-    // res.json(result.rows[0]);
-    res.json({ message: "Cita agendada correctamente. Listo para conectar DB.", data: req.body });
+    // Note: Schema for Cita is (idCita, idCotizacion, idUsuarios, fecha, hora, nota)
+    const { idUsuarios, id_cliente, idCotizacion, fecha, hora, nota, observaciones } = req.body;
+    
+    // Map id_cliente to idUsuarios if needed
+    const userId = idUsuarios || id_cliente || null;
+    const finalNota = nota || observaciones || '';
+
+    const result = await pool.query(
+      'INSERT INTO Cita (idCotizacion, idUsuarios, fecha, hora, nota) VALUES ($1, $2, $3, $4, $5) RETURNING idCita AS id, idCotizacion, idUsuarios, fecha, hora, nota',
+      [idCotizacion || null, userId, fecha, hora, finalNota]
+    );
+    res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -29,9 +31,16 @@ const createCita = async (req, res) => {
 const updateCitaStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { estado } = req.body; // 'confirmada', 'cancelada', etc.
-    // PREPARADO: Actualizar estado de la cita
-    res.json({ message: `Estado de la cita ${id} actualizado a ${estado}. Listo para conectar DB.` });
+    const { nota, observaciones } = req.body;
+    const finalNota = nota || observaciones;
+    
+    // Schema does not have an 'estado' column, so we just update the note if provided
+    if (finalNota !== undefined) {
+      await pool.query('UPDATE Cita SET nota = $1 WHERE idCita = $2', [finalNota, id]);
+      res.json({ message: `Cita ${id} actualizada con nueva nota.` });
+    } else {
+      res.json({ message: `No hay columna de estado en el esquema para la cita ${id}.` });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

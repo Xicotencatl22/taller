@@ -89,7 +89,7 @@ export default function AdminMantenimiento() {
   const manejarEnvio = (e) => {
     e.preventDefault();
     if (!nuevo.vehiculo) return alert("Selecciona un vehículo");
-    
+
     const servicioBaseName = trabajos.length > 0 ? trabajos[0].nombre : 'Mantenimiento General';
     const partesArray = refacciones.map(r => `${r.nombre} x${r.cantidad}`);
 
@@ -131,9 +131,9 @@ export default function AdminMantenimiento() {
             <h2 className="text-3xl font-bold text-gray-900 mb-1">Gestión de Mantenimiento</h2>
             <p className="text-gray-500 text-sm">Registra y administra el mantenimiento de vehículos</p>
           </div>
-          <button 
-            type="button" 
-            onClick={() => setShowModal(true)} 
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
             className="bg-[#1a56db] text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2"
           >
             <span className="text-lg leading-none">+</span> Nuevo registro
@@ -173,7 +173,7 @@ export default function AdminMantenimiento() {
                     <h3 className="text-lg font-bold text-gray-900">{m.servicioBase}</h3>
                     <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                      {m.vehiculo} 
+                      {m.vehiculo}
                       <span className="text-gray-300">•</span>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                       {m.fecha}
@@ -187,7 +187,7 @@ export default function AdminMantenimiento() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="p-6 bg-gray-50/50 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-3">Información del vehículo</h4>
@@ -196,7 +196,7 @@ export default function AdminMantenimiento() {
                     <p><span className="font-medium">Kilometraje:</span> {m.kilometraje}</p>
                     <p><span className="font-medium">Técnico:</span> {m.tecnico}</p>
                   </div>
-                  
+
                   {m.partes.length > 0 && (
                     <div className="mt-4">
                       <h4 className="text-sm font-semibold text-gray-700 mb-2">Partes utilizadas</h4>
@@ -236,7 +236,7 @@ export default function AdminMantenimiento() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col my-8 max-h-[90vh]">
-            
+
             <div className="flex justify-between items-center p-6 border-b border-gray-100 shrink-0">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Nueva Orden de Mantenimiento</h2>
@@ -251,7 +251,7 @@ export default function AdminMantenimiento() {
 
             <div className="p-6 overflow-y-auto flex-1 text-left space-y-6">
               <form id="mantenimientoForm" onSubmit={manejarEnvio}>
-                
+
                 <div className="bg-blue-50/30 border border-blue-50 rounded-xl p-6 mb-6">
                   <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-4">
                     <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
@@ -261,7 +261,7 @@ export default function AdminMantenimiento() {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Seleccionar Vehículo *</label>
                       <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.vehiculo} onChange={e => setNuevo({...nuevo, vehiculo: e.target.value})}>
+                        value={nuevo.vehiculo} onChange={e => setNuevo({ ...nuevo, vehiculo: e.target.value })}>
                         <option value="">-- Selecciona un vehículo --</option>
                         {vehiculosMock.map(v => <option key={v.id} value={v.nombre}>{v.nombre}</option>)}
                       </select>
@@ -269,7 +269,7 @@ export default function AdminMantenimiento() {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Kilometraje Actual *</label>
                       <input required type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.kilometraje} onChange={e => setNuevo({...nuevo, kilometraje: e.target.value})} placeholder="Ej: 45,230 km" />
+                        value={nuevo.kilometraje} onChange={e => setNuevo({ ...nuevo, kilometraje: e.target.value })} placeholder="Ej: 45,230 km" />
                     </div>
                   </div>
                 </div>
@@ -283,12 +283,12 @@ export default function AdminMantenimiento() {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Fecha del Servicio *</label>
                       <input required type="date" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.fecha} onChange={e => setNuevo({...nuevo, fecha: e.target.value})} />
+                        value={nuevo.fecha} onChange={e => setNuevo({ ...nuevo, fecha: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Técnico Responsable *</label>
                       <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.tecnico} onChange={e => setNuevo({...nuevo, tecnico: e.target.value})}>
+                        value={nuevo.tecnico} onChange={e => setNuevo({ ...nuevo, tecnico: e.target.value })}>
                         <option value="">-- Selecciona un técnico --</option>
                         {tecnicosMock.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -296,7 +296,7 @@ export default function AdminMantenimiento() {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Estado</label>
                       <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.estado} onChange={e => setNuevo({...nuevo, estado: e.target.value})}>
+                        value={nuevo.estado} onChange={e => setNuevo({ ...nuevo, estado: e.target.value })}>
                         <option value="En proceso">En proceso</option>
                         <option value="Completado">Completado</option>
                       </select>
@@ -309,7 +309,7 @@ export default function AdminMantenimiento() {
                     <span className="font-bold text-lg leading-none text-green-600">$</span>
                     Trabajos Realizados
                   </h3>
-                  
+
                   {trabajos.map(t => (
                     <div key={t.id} className="flex gap-2 mb-3 items-center">
                       <div className="w-1/3 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{t.nombre}</div>
@@ -331,11 +331,11 @@ export default function AdminMantenimiento() {
                     </div>
                     <div className="flex-1 w-full">
                       <input type="text" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        value={nuevoTrabajo.descripcion} onChange={e => setNuevoTrabajo({...nuevoTrabajo, descripcion: e.target.value})} placeholder="Descripción adicional" />
+                        value={nuevoTrabajo.descripcion} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, descripcion: e.target.value })} placeholder="Descripción adicional" />
                     </div>
                     <div className="w-full md:w-32">
                       <input type="number" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        value={nuevoTrabajo.precio} onChange={e => setNuevoTrabajo({...nuevoTrabajo, precio: e.target.value})} placeholder="Precio" />
+                        value={nuevoTrabajo.precio} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, precio: e.target.value })} placeholder="Precio" />
                     </div>
                     <button type="button" onClick={agregarTrabajo} className="px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-bold whitespace-nowrap">
                       +
@@ -347,14 +347,14 @@ export default function AdminMantenimiento() {
                   <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2 mb-4">
                     Partes y Refacciones Utilizadas
                   </h3>
-                  
+
                   {refacciones.map(r => (
                     <div key={r.id} className="flex gap-2 mb-3 items-center">
                       <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{r.nombre}</div>
                       <div className="w-20 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">{r.cantidad}</div>
                       <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">${r.precio}</div>
                       <button type="button" onClick={() => eliminarRefaccion(r.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
-                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   ))}
@@ -362,15 +362,15 @@ export default function AdminMantenimiento() {
                   <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
                     <div className="flex-1 w-full">
                       <input type="text" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.nombre} onChange={e => setNuevaRefaccion({...nuevaRefaccion, nombre: e.target.value})} placeholder="Nombre de la parte" />
+                        value={nuevaRefaccion.nombre} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, nombre: e.target.value })} placeholder="Nombre de la parte" />
                     </div>
                     <div className="w-full md:w-20">
                       <input type="number" min="1" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.cantidad} onChange={e => setNuevaRefaccion({...nuevaRefaccion, cantidad: e.target.value})} placeholder="1" />
+                        value={nuevaRefaccion.cantidad} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, cantidad: e.target.value })} placeholder="1" />
                     </div>
                     <div className="w-full md:w-32">
                       <input type="number" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.precio} onChange={e => setNuevaRefaccion({...nuevaRefaccion, precio: e.target.value})} placeholder="Precio unitario" />
+                        value={nuevaRefaccion.precio} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, precio: e.target.value })} placeholder="Precio unitario" />
                     </div>
                     <button type="button" onClick={agregarRefaccion} className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-bold whitespace-nowrap">
                       +
@@ -381,7 +381,7 @@ export default function AdminMantenimiento() {
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Observaciones y Notas</label>
                   <textarea className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" rows="4"
-                    value={nuevo.observaciones} onChange={e => setNuevo({...nuevo, observaciones: e.target.value})} placeholder="Escribe cualquier observación importante sobre el trabajo realizado..."></textarea>
+                    value={nuevo.observaciones} onChange={e => setNuevo({ ...nuevo, observaciones: e.target.value })} placeholder="Escribe cualquier observación importante sobre el trabajo realizado..."></textarea>
                 </div>
 
                 <div className="bg-[#1a56db] rounded-xl p-6 text-white flex justify-between items-center mb-6">
@@ -405,7 +405,7 @@ export default function AdminMantenimiento() {
                 Crear Orden
               </button>
             </div>
-            
+
           </div>
         </div>
       )}

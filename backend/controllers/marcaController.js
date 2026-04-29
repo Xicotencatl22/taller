@@ -1,10 +1,10 @@
 const pool = require('../db');
 
 const getMarcas = async (req, res) => {
-  try{
-    const result = await pool.query('SELECT idmarca, nombre FROM marca');
+  try {
+    const result = await pool.query('SELECT idMarcas AS idmarca, nombre FROM Marca');
     res.json(result.rows);
-  } catch (err){
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
