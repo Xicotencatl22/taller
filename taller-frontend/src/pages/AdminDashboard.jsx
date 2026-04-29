@@ -512,7 +512,7 @@ function AdminDashboard() {
                   <h2 className="text-3xl font-bold text-gray-900 mb-1">Gestión de Usuarios</h2>
                   <p className="text-gray-500 text-sm">Administra los usuarios y sus roles en el sistema</p>
                 </div>
-                <button onClick={() => openUserModal()} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium">+ Invitar Usuario</button>
+                <button onClick={() => openUserModal()} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium">+ Registrar Usuario</button>
               </div>
 
               {/* User Stats Cards */}
@@ -593,7 +593,7 @@ function AdminDashboard() {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                   <div className="bg-white rounded-2xl shadow-lg max-w-md w-full mx-4 p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">{editingUserId ? 'Editar usuario' : 'Invitar nuevo usuario'}</h3>
+                      <h3 className="text-xl font-bold">{editingUserId ? 'Editar usuario' : 'Registrar nuevo usuario'}</h3>
                       <button onClick={closeUserModal} className="text-gray-400 hover:text-gray-600">✕</button>
                     </div>
                     <form onSubmit={handleUserSubmit} className="space-y-4">
@@ -667,7 +667,7 @@ function AdminDashboard() {
                       {userError && <p className="text-red-600 text-sm bg-red-50 p-2 rounded">{userError}</p>}
                       <div className="flex gap-3 pt-4">
                         <button type="button" onClick={closeUserModal} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Cancelar</button>
-                        <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{editingUserId ? 'Guardar cambios' : 'Enviar invitación'}</button>
+                        <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{editingUserId ? 'Guardar cambios' : 'Registrar'}</button>
                       </div>
                     </form>
                   </div>
