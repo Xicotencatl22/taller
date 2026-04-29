@@ -1,10 +1,10 @@
 const pool = require('../db');
 
 const getAnios = async (req, res) => {
-  try{
-    const result = await pool.query('SELECT * FROM anio');
+  try {
+    const result = await pool.query('SELECT * FROM Anio');
     res.json(result.rows);
-  } catch (err){
+  } catch (err) {
     console.error('Error en getAnios:', err.message);
     res.status(500).json({ error: err.message });
   }
@@ -19,7 +19,7 @@ const getModelosByMarca = async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT idmodelo, nombre FROM modelo WHERE idmarca = $1 order by nombre',
+      'SELECT idModelos AS idmodelo, nombre FROM Modelos WHERE idMarcas = $1 ORDER BY nombre',
       [idmarca]
     );
     res.json(result.rows);
@@ -29,10 +29,10 @@ const getModelosByMarca = async (req, res) => {
 };
 
 const getMotores = async (req, res) => {
-  try{
-    const result = await pool.query('SELECT idmotor, nombre FROM motor');
+  try {
+    const result = await pool.query('SELECT idMotores AS idmotor, tipo_motor AS nombre FROM Motores');
     res.json(result.rows);
-  } catch (err){
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
