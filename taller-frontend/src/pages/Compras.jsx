@@ -1,44 +1,113 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { fetchCompras, fetchProveedores, fetchBajoStock, createCompra, fetchProductos } from '../utils/api';
 
 export default function Compras() {
-  const [compras, setCompras] = useState([
-    {
-      id: 1,
-      orden: 'ORD-001',
-      fecha: '9/3/2026',
-      proveedor: 'Distribuidora ABC',
-      estadoRecepcion: 'Recibido',
-      estadoPago: 'Pagado',
-      total: 6400,
-      productos: [
-        { nombre: 'Aceite sintético 5W-30', cantidad: 20, costoUnitario: 180, total: 3600 },
-        { nombre: 'Bujías platino (set 4pz)', cantidad: 10, costoUnitario: 280, total: 2800 }
-      ]
-    }
-  ]);
-
-  const [bajoStock, setBajoStock] = useState([
-    { id: 101, nombre: 'Pastillas de freno delanteras', stockActual: 8, minimo: 12, proveedor: 'Auto Partes SA', sugerido: 20, costoTotal: 9000 },
-    { id: 102, nombre: 'Líquido de frenos DOT 4', stockActual: 5, minimo: 10, proveedor: 'Refacciones XYZ', sugerido: 15, costoTotal: 1800 }
-  ]);
+  const [compras, setCompras] = useState([]);
+  const [bajoStock, setBajoStock] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [showModal, setShowModal] = useState(false);
   const [nuevo, setNuevo] = useState({
-    proveedor: '',
-    numeroOrden: 'ORD-003',
-    estadoPago: 'Pendiente',
+    idProveedor: '',
+    estado_pago: 'Pendiente',
+    estado_compra: 'Recibido',
     productos: [{ id: Date.now(), productoId: '', cantidad: 1, costo: 0, total: 0 }]
   });
 
-  const manejarEnvio = (e) => {
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [comprasData, stockData, provData, prodData] = await Promise.all([
+        fetchCompras(),
+        fetchBajoStock(),
+        fetchProveedores(),
+        fetchProductos()
+      ]);
+      setCompras(comprasData || []);
+      setBajoStock(stockData || []);
+      setProveedores(provData || []);
+      setProductos(prodData || []);
+    } catch (error) {
+      console.error('Error cargando datos de compras:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const manejarEnvio = async (e) => {
     e.preventDefault();
-    setShowModal(false);
+    try {
+      const total = calcularTotalOrden();
+      await createCompra({
+        idProveedor: nuevo.idProveedor,
+        estado_compra: nuevo.estado_compra,
+        estado_pago: nuevo.estado_pago,
+        total,
+        productos: nuevo.productos.filter(p => p.productoId)
+      });
+      setShowModal(false);
+      loadData();
+      setNuevo({
+        idProveedor: '',
+        estado_pago: 'Pendiente',
+        estado_compra: 'Recibido',
+        productos: [{ id: Date.now(), productoId: '', cantidad: 1, costo: 0, total: 0 }]
+      });
+    } catch (err) {
+      alert('Error al crear orden: ' + err.message);
+    }
   };
 
   const calcularTotalOrden = () => {
     return nuevo.productos.reduce((acc, p) => acc + p.total, 0);
   };
+
+  const handleAddProduct = () => {
+    setNuevo(prev => ({
+      ...prev,
+      productos: [...prev.productos, { id: Date.now(), productoId: '', cantidad: 1, costo: 0, total: 0 }]
+    }));
+  };
+
+  const handleProductChange = (id, field, value) => {
+    setNuevo(prev => ({
+      ...prev,
+      productos: prev.productos.map(p => {
+        if (p.id === id) {
+          const updated = { ...p, [field]: value };
+          updated.total = updated.cantidad * updated.costo;
+          return updated;
+        }
+        return p;
+      })
+    }));
+  };
+
+  const removeProduct = (id) => {
+    setNuevo(prev => ({
+      ...prev,
+      productos: prev.productos.filter(p => p.id !== id)
+    }));
+  };
+
+  const totalCompras = compras.reduce((acc, c) => acc + Number(c.total || 0), 0);
+  const ordenesMes = compras.length; // Podrías filtrar por mes aquí
+  const costoPendiente = bajoStock.reduce((acc, b) => acc + Number(b.costo_total || 0), 0);
+
+  if (loading) {
+    return (
+      <AdminLayout activeTab="compras">
+        <div className="p-8 flex justify-center"><p>Cargando datos...</p></div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout activeTab="compras">
@@ -62,12 +131,12 @@ export default function Compras() {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-            <span className="text-3xl font-medium text-blue-600 mb-2">2</span>
-            <span className="text-sm text-gray-500">Órdenes este mes</span>
+            <span className="text-3xl font-medium text-blue-600 mb-2">{ordenesMes}</span>
+            <span className="text-sm text-gray-500">Órdenes registradas</span>
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-            <span className="text-3xl font-medium text-green-500 mb-2">$10,750</span>
+            <span className="text-3xl font-medium text-green-500 mb-2">${totalCompras.toLocaleString()}</span>
             <span className="text-sm text-gray-500">Total en compras</span>
           </div>
 
@@ -76,13 +145,13 @@ export default function Compras() {
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <span className="text-3xl font-medium">2</span>
+              <span className="text-3xl font-medium">{bajoStock.length}</span>
             </div>
             <span className="text-sm text-gray-500">Productos por ordenar</span>
           </div>
 
           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-            <span className="text-3xl font-medium text-blue-600 mb-2">$10,800</span>
+            <span className="text-3xl font-medium text-blue-600 mb-2">${costoPendiente.toLocaleString()}</span>
             <span className="text-sm text-gray-500">Costo estimado pendiente</span>
           </div>
         </div>
@@ -113,21 +182,15 @@ export default function Compras() {
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-900">{prod.nombre}</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">Stock actual: {prod.stockActual} / Mínimo: {prod.minimo} <span className="mx-1.5">•</span> {prod.proveedor}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Stock actual: {prod.stock_actual} / Mínimo: {prod.stock_minimo}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Cantidad sugerida: {prod.sugerido}</p>
-                    <p className="font-bold text-gray-900 mt-0.5">${prod.costoTotal}</p>
+                    <p className="font-bold text-gray-900 mt-0.5">${Number(prod.costo_total).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
-            </div>
-
-            <div className="pl-14">
-              <button className="bg-[#f97316] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-600 transition-colors">
-                Generar órdenes de compra
-              </button>
             </div>
           </div>
         )}
@@ -137,7 +200,7 @@ export default function Compras() {
           <h3 className="text-lg font-bold text-gray-900 mb-4">Órdenes de compra recientes</h3>
           <div className="space-y-6">
             {compras.map(compra => (
-              <div key={compra.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 relative">
+              <div key={compra.numero_orden} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 relative">
                 
                 {/* Card Header */}
                 <div className="flex justify-between items-start mb-6">
@@ -148,23 +211,23 @@ export default function Compras() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900 leading-tight">Orden: {compra.orden}</h3>
+                      <h3 className="text-xl font-bold text-gray-900 leading-tight">Orden: ORD-{compra.numero_orden}</h3>
                       <div className="flex items-center text-sm text-gray-500 mt-1">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                         </svg>
-                        {compra.fecha} <span className="mx-2">•</span> {compra.proveedor}
+                        {new Date(compra.fecha).toLocaleDateString()} <span className="mx-2">•</span> {compra.proveedor_nombre || 'Proveedor desconocido'}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-900 mb-1.5">${compra.total}</div>
+                    <div className="text-xl font-bold text-gray-900 mb-1.5">${Number(compra.total).toLocaleString()}</div>
                     <div className="flex gap-2 justify-end">
                       <div className="px-2.5 py-0.5 bg-green-100 text-green-700 font-semibold text-[11px] uppercase tracking-wider rounded-full">
-                        {compra.estadoRecepcion}
+                        {compra.estado_compra}
                       </div>
                       <div className="px-2.5 py-0.5 bg-blue-50 text-blue-700 font-semibold text-[11px] uppercase tracking-wider rounded-full">
-                        {compra.estadoPago}
+                        {compra.estado_pago}
                       </div>
                     </div>
                   </div>
@@ -176,11 +239,11 @@ export default function Compras() {
                 <div className="mb-2">
                   <h4 className="text-sm font-semibold text-gray-500 mb-4">Productos ordenados</h4>
                   <div className="space-y-4">
-                    {compra.productos.map((prod, idx) => (
+                    {compra.productos && compra.productos.map((prod, idx) => (
                       <div key={idx} className="flex justify-between items-start">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{prod.nombre}</p>
-                          <p className="text-xs text-gray-500">Cantidad: {prod.cantidad} × ${prod.costoUnitario}</p>
+                          <p className="text-sm font-medium text-gray-900">{prod.producto_nombre || 'Producto eliminado'}</p>
+                          <p className="text-xs text-gray-500">Cantidad: {prod.cantidad} × ${prod.precio_unitario}</p>
                         </div>
                         <div className="text-sm font-medium text-gray-700">
                           ${prod.total}
@@ -226,25 +289,21 @@ export default function Compras() {
                 {/* Información de la orden */}
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 mb-4">Información de la orden</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Proveedor <span className="text-red-500">*</span></label>
-                      <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium" required>
-                        <option value="" disabled selected hidden>Seleccionar proveedor</option>
-                        <option value="Auto Partes SA">Auto Partes SA</option>
-                        <option value="Distribuidora ABC">Distribuidora ABC</option>
-                        <option value="Refacciones XYZ">Refacciones XYZ</option>
+                      <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium" required
+                        value={nuevo.idProveedor} onChange={e => setNuevo({...nuevo, idProveedor: e.target.value})}>
+                        <option value="" disabled hidden>Seleccionar proveedor</option>
+                        {proveedores.map(prov => (
+                          <option key={prov.idproveedor} value={prov.idproveedor}>{prov.nombre}</option>
+                        ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Número de orden <span className="text-red-500">*</span></label>
-                      <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none" required
-                        value={nuevo.numeroOrden} onChange={e => setNuevo({...nuevo, numeroOrden: e.target.value})} placeholder="ORD-003" />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Estado de pago <span className="text-red-500">*</span></label>
                       <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white font-medium" required
-                         value={nuevo.estadoPago} onChange={e => setNuevo({...nuevo, estadoPago: e.target.value})}>
+                         value={nuevo.estado_pago} onChange={e => setNuevo({...nuevo, estado_pago: e.target.value})}>
                         <option value="Pendiente">Pendiente</option>
                         <option value="Pagado">Pagado</option>
                       </select>
@@ -258,31 +317,47 @@ export default function Compras() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-sm font-bold text-gray-900">Productos a ordenar</h3>
-                    <button type="button" className="bg-[#1a56db] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors flex items-center gap-1">
+                    <button type="button" onClick={handleAddProduct} className="bg-[#1a56db] text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-800 transition-colors flex items-center gap-1">
                       <span>+</span> Agregar producto
                     </button>
                   </div>
                   
                   {nuevo.productos.map((prod, index) => (
-                    <div key={prod.id} className="flex flex-col sm:flex-row gap-3 mb-3">
+                    <div key={prod.id} className="flex flex-col sm:flex-row gap-3 mb-3 items-center">
                       <div className="flex-1">
-                        <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white">
-                          <option value="" disabled selected hidden>Seleccionar producto</option>
-                          <option value="1">Pastillas de freno delanteras</option>
-                          <option value="2">Líquido de frenos DOT 4</option>
+                        <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none bg-white" required
+                          value={prod.productoId} onChange={(e) => {
+                            const val = e.target.value;
+                            const pr = productos.find(p => p.idproductos === Number(val));
+                            handleProductChange(prod.id, 'productoId', val);
+                            if (pr) {
+                              handleProductChange(prod.id, 'costo', pr.precio_unitario || 0);
+                            }
+                          }}>
+                          <option value="" disabled hidden>Seleccionar producto</option>
+                          {productos.map(p => (
+                            <option key={p.idproductos} value={p.idproductos}>{p.nombre}</option>
+                          ))}
                         </select>
                       </div>
                       <div className="w-full sm:w-20">
                         <input type="number" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none text-center"
-                           value={prod.cantidad} min="1" placeholder="1" />
+                           value={prod.cantidad} min="1" placeholder="Cant" onChange={e => handleProductChange(prod.id, 'cantidad', Number(e.target.value))} required />
                       </div>
                       <div className="w-full sm:w-24">
                         <input type="number" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 outline-none text-center"
-                           value={prod.costo} min="0" placeholder="0" />
+                           value={prod.costo} min="0" placeholder="Costo" onChange={e => handleProductChange(prod.id, 'costo', Number(e.target.value))} required />
                       </div>
-                      <div className="w-full sm:w-32 flex items-center justify-end px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg font-medium text-gray-900 text-sm">
-                        $0.00
+                      <div className="w-full sm:w-24 flex items-center justify-end px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg font-medium text-gray-900 text-sm">
+                        ${prod.total}
                       </div>
+                      {nuevo.productos.length > 1 && (
+                        <button type="button" onClick={() => removeProduct(prod.id)} className="text-red-500 hover:text-red-700">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -290,7 +365,7 @@ export default function Compras() {
                 {/* Footer calculations inline */}
                 <div className="flex justify-between items-center py-4 px-6 bg-gray-50/50 rounded-xl border border-gray-100 mt-6">
                   <span className="font-bold text-gray-900">Total de la orden</span>
-                  <span className="font-bold text-lg text-[#1a56db]">${calcularTotalOrden().toFixed(2)} MXN</span>
+                  <span className="font-bold text-lg text-[#1a56db]">${calcularTotalOrden().toLocaleString()} MXN</span>
                 </div>
 
               </form>

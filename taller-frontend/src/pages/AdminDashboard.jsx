@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { fetchDashboardStats } from '../utils/api';
 
 const PERMISSIONS = ['Dashboard', 'Citas', 'Vehículos', 'Servicios', 'Productos', 'Ventas', 'Compras', 'Cotizaciones', 'Reportes', 'Usuarios', 'Roles'];
 
@@ -16,6 +17,20 @@ function AdminDashboard() {
       setTab(location.state.tab);
     }
   }, [location.state?.tab]);
+
+  const [stats, setStats] = useState({
+    inventoryValue: 0,
+    totalSales: 0,
+    pendingAppointments: 0,
+    totalVehicles: 0,
+    chartData: []
+  });
+
+  useEffect(() => {
+    if (tab === 'dashboard') {
+      fetchDashboardStats().then(setStats).catch(console.error);
+    }
+  }, [tab]);
 
   // User modal and search
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -379,7 +394,7 @@ function AdminDashboard() {
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">$5354</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">${Number(stats.inventoryValue).toLocaleString()}</div>
                   <div className="text-xs text-gray-400">Total en productos</div>
                 </div>
 
@@ -390,30 +405,30 @@ function AdminDashboard() {
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">$1,318</div>
-                  <div className="text-xs font-medium text-green-500">+282% vs mes anterior</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">${Number(stats.totalSales).toLocaleString()}</div>
+                  <div className="text-xs font-medium text-green-500">Total histórico registrado</div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <div className="flex justify-between items-start mb-4">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Compras</span>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Citas Pendientes</span>
                     <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 4.5l-15 15m0 0h11.25m-11.25 0V8.25" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
-                  <div className="text-xs text-gray-400">Este mes</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.pendingAppointments}</div>
+                  <div className="text-xs text-gray-400">Por atender</div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <div className="flex justify-between items-start mb-4">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Ingresos Taller</span>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Vehículos</span>
                     <div className="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center text-yellow-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.83-5.83M11.42 15.17l-1.39-1.39m0 0l-3.9 3.9a2.38 2.38 0 01-3.32-3.32l3.9-3.9m0 0l-1.39-1.39m1.39 1.39L6.5 4.67M2.38 2.38a2.38 2.38 0 013.32 0l7.52 7.52m0 0l1.39-1.39" /></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677h3.351a.75.75 0 01.696.471z" /></svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900 mb-1">$0</div>
-                  <div className="text-xs text-gray-400">Servicios realizados</div>
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stats.totalVehicles}</div>
+                  <div className="text-xs text-gray-400">Registrados en total</div>
                 </div>
 
               </div>
@@ -450,30 +465,15 @@ function AdminDashboard() {
 
                     {/* Bars */}
                     <div className="ml-10 flex-1 flex items-end justify-between px-2 z-10 gap-2">
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '15%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Oct 25</span>
-                      </div>
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '10%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Nov 25</span>
-                      </div>
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '20%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Dic 25</span>
-                      </div>
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '12%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Ene 26</span>
-                      </div>
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '25%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Feb 26</span>
-                      </div>
-                      <div className="w-full flex-col flex items-center gap-2">
-                        <div className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" style={{ height: '85%' }}></div>
-                        <span className="text-xs text-gray-500 font-medium">Mar 26</span>
-                      </div>
+                      {stats.chartData.map((d, i) => (
+                        <div key={i} className="w-full flex-col flex items-center gap-2">
+                          <div 
+                            className="w-full bg-[#3B82F6] rounded-t-lg transition-all duration-500" 
+                            style={{ height: `${Math.min(90, (d.total / 2000) * 100)}%` }}
+                          ></div>
+                          <span className="text-xs text-gray-500 font-medium">{d.month}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -483,20 +483,20 @@ function AdminDashboard() {
                   <h3 className="text-lg font-bold text-gray-900 mb-6">Resumen rápido</h3>
                   <div className="flex flex-col gap-4">
                     <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-50">
-                      <div className="text-2xl font-bold text-blue-600 mb-1">12</div>
+                      <div className="text-2xl font-bold text-blue-600 mb-1">{stats.pendingAppointments}</div>
                       <div className="text-xs font-medium text-gray-600">Citas pendientes</div>
                     </div>
                     <div className="bg-green-50/50 p-4 rounded-xl border border-green-50">
-                      <div className="text-2xl font-bold text-green-600 mb-1">45</div>
-                      <div className="text-xs font-medium text-gray-600">Productos en stock</div>
+                      <div className="text-2xl font-bold text-green-600 mb-1">{stats.totalSales ? Math.round(stats.totalSales / 500) : 0}</div>
+                      <div className="text-xs font-medium text-gray-600">Servicios realizados</div>
                     </div>
                     <div className="bg-yellow-50/50 p-4 rounded-xl border border-yellow-50">
-                      <div className="text-2xl font-bold text-yellow-600 mb-1">8</div>
-                      <div className="text-xs font-medium text-gray-600">Servicios completados</div>
+                      <div className="text-2xl font-bold text-yellow-600 mb-1">{stats.totalVehicles}</div>
+                      <div className="text-xs font-medium text-gray-600">Vehículos registrados</div>
                     </div>
                     <div className="bg-fuchsia-50/50 p-4 rounded-xl border border-fuchsia-50">
-                      <div className="text-2xl font-bold text-fuchsia-600 mb-1">24</div>
-                      <div className="text-xs font-medium text-gray-600">Vehículos registrados</div>
+                      <div className="text-2xl font-bold text-fuchsia-600 mb-1">{stats.pendingAppointments}</div>
+                      <div className="text-xs font-medium text-gray-600">Citas por atender</div>
                     </div>
                   </div>
                 </div>

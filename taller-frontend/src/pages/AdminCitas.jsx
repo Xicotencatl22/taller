@@ -1,21 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { fetchCitas, updateCita, createCita, fetchServicios } from '../utils/api';
 
-const fechasDisponibles = [
-  { diaSemana: 'MIÉ', dia: '25', mes: 'Mar' },
-  { diaSemana: 'JUE', dia: '26', mes: 'Mar' },
-  { diaSemana: 'VIE', dia: '27', mes: 'Mar' },
-  { diaSemana: 'SÁB', dia: '28', mes: 'Mar' },
-  { diaSemana: 'LUN', dia: '30', mes: 'Mar' },
-  { diaSemana: 'MAR', dia: '31', mes: 'Mar' },
-  { diaSemana: 'MIÉ', dia: '1', mes: 'Abr' },
-  { diaSemana: 'JUE', dia: '2', mes: 'Abr' },
-];
-
-const horasDisponibles = [
-  '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', 
-  '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'
-];
 
 export default function AdminCitas() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,55 +9,46 @@ export default function AdminCitas() {
 
   // Appointments state
   const [citas, setCitas] = useState([]);
+  const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+
+  const loadCitas = async () => {
+    try {
+      const data = await fetchCitas();
+      const enriched = data.map((item) => ({
+        ...item,
+        avatar: item.cliente ? item.cliente.charAt(0).toUpperCase() : 'C',
+        estado: item.estado || 'Pendiente',
+        fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+        hora: item.hora || 'Sin hora',
+        costo: item.costo || 0,
+      }));
+      setCitas(enriched);
+    } catch (error) {
+      console.error('Error cargando citas:', error);
+      setCitas([]);
+    }
+  };
 
   useEffect(() => {
-    const mockCitas = [
-      {
-        id: 1,
-        cliente: 'María González',
-        email: 'maria@email.com',
-        telefono: '123-456-7890',
-        vehiculo: 'Toyota Corolla 2020',
-        servicio: 'Afinación básica',
-        fecha: '19/3/2026',
-        hora: '10:00 AM',
-        costo: 1540,
-        estado: 'Confirmada',
-        avatar: 'M'
-      },
-      {
-        id: 2,
-        cliente: 'Pedro Martínez',
-        email: 'pedro@email.com',
-        telefono: '123-456-7891',
-        vehiculo: 'Honda Civic 2019',
-        servicio: 'Cambio de aceite y filtro',
-        fecha: '20/3/2026',
-        hora: '2:00 PM',
-        costo: 850,
-        estado: 'Pendiente',
-        avatar: 'P'
-      },
-      {
-        id: 3,
-        cliente: 'Ana López',
-        email: 'ana@email.com',
-        telefono: '123-456-7892',
-        vehiculo: 'Nissan Sentra 2021',
-        servicio: 'Servicio de frenos básico',
-        fecha: '21/3/2026',
-        hora: '9:00 AM',
-        costo: 1800,
-        estado: 'Confirmada',
-        avatar: 'A'
-      }
-    ];
-    setCitas(mockCitas);
+    loadCitas();
+    fetchServicios()
+      .then(data => setServiciosDisponibles(data || []))
+      .catch(() => setServiciosDisponibles([]));
   }, []);
 
+  const handleUpdateCita = async (id, updates) => {
+    try {
+      await updateCita(id, updates);
+      loadCitas();
+    } catch (error) {
+      console.error('Error actualizando cita:', error);
+      alert('No se pudo actualizar la cita. Por favor, inténtalo de nuevo.');
+    }
+  };
+
   // Modal State
-  const [selectedFecha, setSelectedFecha] = useState(null);
-  const [selectedHora, setSelectedHora] = useState(null);
+  const [selectedFecha, setSelectedFecha] = useState('');
+  const [selectedHora, setSelectedHora] = useState('');
   const [formData, setFormData] = useState({
     nombre: '',
     telefono: '',
@@ -88,6 +65,8 @@ export default function AdminCitas() {
     switch (estado) {
       case 'Confirmada': return 'bg-[#d1fae5] text-[#065f46]';
       case 'Pendiente': return 'bg-[#fef3c7] text-[#92400e]';
+      case 'Cancelada': return 'bg-[#fee2e2] text-[#991b1b]';
+      case 'Reagendada': return 'bg-[#e0f2fe] text-[#0369a1]';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -97,7 +76,30 @@ export default function AdminCitas() {
   
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setTimeout(() => setModalStep(1), 300); // Reset after animation
+    setTimeout(() => {
+      setModalStep(1);
+      setSelectedFecha('');
+      setSelectedHora('');
+      setFormData({ nombre: '', telefono: '', email: '', marca: '', modelo: '', ano: '', placa: '', servicios: [], notas: '' });
+    }, 300);
+  };
+
+  const handleConfirmarCita = async () => {
+    try {
+      await createCita({
+        idUsuarios: null,
+        idCotizacion: null,
+        fecha: selectedFecha || null,
+        hora: selectedHora || null,
+        nota: formData.notas || `Cliente: ${formData.nombre} - ${formData.email}`,
+        estado: 'Pendiente',
+      });
+      alert('¡Cita agendada exitosamente!');
+      handleCloseModal();
+      loadCitas();
+    } catch (err) {
+      alert(`Error al guardar la cita: ${err.message}`);
+    }
   };
 
   return (
@@ -211,12 +213,12 @@ export default function AdminCitas() {
               {/* Bottom Actions Row */}
               <div className="flex justify-between items-center relative z-10">
                 <div className="flex gap-2">
-                  <button onClick={() => window.alert(`Detalles de la Cita:\n\nCliente: ${cita.cliente}\nCorreo: ${cita.email}\nTeléfono: ${cita.telefono}\n\nVehículo: ${cita.vehiculo}\nServicio: ${cita.servicio}\n\nFecha Programada: ${cita.fecha} a las ${cita.hora}\nCosto Estimado: $${cita.costo}\nEstado: ${cita.estado}`)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Ver detalles</button>
-                  <button className="bg-[#10b981] hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Confirmar</button>
-                  <button className="bg-[#f59e0b] hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reagendar</button>
-                  <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Editar</button>
+                  <button onClick={() => window.alert(`Detalles de la Cita:\n\nCliente: ${cita.cliente}\nCorreo: ${cita.email || 'N/A'}\nTeléfono: ${cita.telefono || 'N/A'}\n\nVehículo: ${cita.vehiculo}\nServicio: ${cita.servicio}\n\nFecha Programada: ${cita.fecha} a las ${cita.hora}\nCosto Estimado: $${cita.costo}\nEstado: ${cita.estado}`)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Ver detalles</button>
+                  <button onClick={() => handleUpdateCita(cita.id, { estado: 'Confirmada' })} className="bg-[#10b981] hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Confirmar</button>
+                  <button onClick={() => handleUpdateCita(cita.id, { estado: 'Reagendada' })} className="bg-[#f59e0b] hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reagendar</button>
+                  <button onClick={() => handleUpdateCita(cita.id, { nota: 'Requiere revisión de administrador' })} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Editar</button>
                 </div>
-                <button className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
+                <button onClick={() => handleUpdateCita(cita.id, { estado: 'Cancelada' })} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
                   Cancelar cita
                 </button>
               </div>
@@ -272,39 +274,26 @@ export default function AdminCitas() {
               
               {/* --- STEP 1: Fecha y hora --- */}
               {modalStep === 1 && (
-                <div className="flex flex-col md:flex-row gap-8 h-full">
-                  <div className="flex-1 border-r border-gray-100 pr-4">
-                    <h3 className="text-sm font-bold text-gray-700 mb-4">Fecha disponible</h3>
-                    <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2">
-                      {fechasDisponibles.map((f, i) => (
-                        <button 
-                          key={i}
-                          type="button"
-                          onClick={() => setSelectedFecha(f)}
-                          className={`p-4 rounded-xl border text-center transition-all ${selectedFecha?.dia === f.dia ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50/30' : 'border-gray-200 hover:border-blue-300 bg-white'}`}
-                        >
-                          <div className={`text-xs font-bold mb-1 ${selectedFecha?.dia === f.dia ? 'text-blue-600' : 'text-gray-500'}`}>{f.diaSemana}</div>
-                          <div className={`text-2xl font-black mb-1 ${selectedFecha?.dia === f.dia ? 'text-blue-700' : 'text-gray-900'}`}>{f.dia}</div>
-                          <div className={`text-sm font-medium ${selectedFecha?.dia === f.dia ? 'text-blue-600' : 'text-gray-500'}`}>{f.mes}</div>
-                        </button>
-                      ))}
+                <div className="max-w-lg mx-auto space-y-6">
+                  <h3 className="text-sm font-bold text-gray-700 mb-2">Fecha y hora de la cita</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Fecha *</label>
+                      <input
+                        type="date"
+                        value={selectedFecha}
+                        onChange={e => setSelectedFecha(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
-                  </div>
-                  
-                  <div className="flex-1 pl-2">
-                    <h3 className="text-sm font-bold text-gray-700 mb-4">Hora disponible</h3>
-                    <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-2">
-                      {horasDisponibles.map((h, i) => (
-                        <button 
-                          key={i}
-                          type="button"
-                          onClick={() => setSelectedHora(h)}
-                          className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${selectedHora === h ? 'border-blue-500 bg-blue-50 text-blue-700 font-bold' : 'border-gray-200 hover:border-blue-300 text-gray-600 bg-white'}`}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          {h}
-                        </button>
-                      ))}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hora</label>
+                      <input
+                        type="time"
+                        value={selectedHora}
+                        onChange={e => setSelectedHora(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -367,33 +356,31 @@ export default function AdminCitas() {
                     <div className="mb-4">
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicios solicitados *</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
-                        {[
-                          'Cambio de aceite y filtro',
-                          'Afinación básica',
-                          'Afinación integral',
-                          'Servicio de frenos básico',
-                          'Servicio de frenos plus'
-                        ].map((s, idx) => {
-                          const isSelected = formData.servicios?.includes(s);
-                          return (
-                            <label key={idx} className={`flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                              <input 
-                                type="checkbox" 
-                                className="rounded text-blue-600 focus:ring-blue-500"
-                                checked={isSelected || false}
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setFormData(prev => {
-                                    const current = prev.servicios || [];
-                                    const newServicios = checked ? [...current, s] : current.filter(item => item !== s);
-                                    return { ...prev, servicios: newServicios };
-                                  });
-                                }}
-                              />
-                              <span className="text-sm font-medium text-gray-800">{s}</span>
-                            </label>
-                          );
-                        })}
+                        {serviciosDisponibles.length === 0 ? (
+                          <p className="text-xs text-gray-400 italic col-span-2">Cargando servicios...</p>
+                        ) : (
+                          serviciosDisponibles.map((s) => {
+                            const isSelected = formData.servicios?.includes(s.nombre);
+                            return (
+                              <label key={s.id} className={`flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={isSelected || false}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setFormData(prev => {
+                                      const current = prev.servicios || [];
+                                      const newServicios = checked ? [...current, s.nombre] : current.filter(item => item !== s.nombre);
+                                      return { ...prev, servicios: newServicios };
+                                    });
+                                  }}
+                                />
+                                <span className="text-sm font-medium text-gray-800">{s.nombre}</span>
+                              </label>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
 
@@ -420,7 +407,7 @@ export default function AdminCitas() {
                       <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Fecha y hora</div>
                       <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                         <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        {selectedFecha ? `${selectedFecha.diaSemana.toLowerCase()}., ${selectedFecha.dia} de ${selectedFecha.mes.toLowerCase()} de 2026 - ${selectedHora}` : 'Fecha no seleccionada'}
+                        {selectedFecha ? `${selectedFecha} ${selectedHora ? '- ' + selectedHora : ''}` : 'Fecha no seleccionada'}
                       </div>
                     </div>
 
@@ -477,20 +464,20 @@ export default function AdminCitas() {
               </button>
               
               {modalStep < 3 ? (
-                 <button 
-                  onClick={nextStep} 
-                  disabled={modalStep === 1 && (!selectedFecha || !selectedHora)}
+                 <button
+                  onClick={nextStep}
+                  disabled={modalStep === 1 && !selectedFecha}
                   className={`px-6 py-2 rounded-lg text-sm font-bold transition-all shadow-sm ${
-                    modalStep === 1 && (!selectedFecha || !selectedHora) 
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                    : 'bg-[#cbd5e1] text-gray-700 hover:bg-gray-300' // Using an active color resembling the screenshot's 'Continuar'
+                    modalStep === 1 && !selectedFecha
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-[#1A56DB] text-white hover:bg-blue-700'
                   }`}
                  >
                    Continuar
                  </button>
               ) : (
-                <button 
-                  onClick={() => { alert('Cita guardada!'); handleCloseModal(); }}
+                <button
+                  onClick={handleConfirmarCita}
                   className="px-6 py-2 rounded-lg text-sm font-bold bg-[#10b981] hover:bg-emerald-600 text-white transition-all shadow-sm"
                 >
                   Confirmar cita

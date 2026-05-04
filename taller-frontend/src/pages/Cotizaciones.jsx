@@ -1,55 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { fetchCotizaciones, createCotizacion, fetchServicios } from '../utils/api';
 
 export default function Cotizaciones() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Mock data based on screenshot
-  const stats = {
-    activas: 3,
-    aceptadas: 1,
-    pendientes: 1,
-    valorTotal: 6150
-  };
-
-  const cotizaciones = [
-    {
-      id: 1,
-      cliente: 'Roberto Sánchez',
-      email: 'roberto@email.com',
-      estado: 'Enviada', // Enviada, Aceptada, Pendiente
-      servicio: 'Afinación integral',
-      vehiculo: 'Mazda 3 2018',
-      fecha: '15/3/2026',
-      validaHasta: '29/3/2026',
-      manoObra: 1200,
-      refacciones: 1600,
-      total: 2800,
-      avatar: 'R'
-    },
-    {
-      id: 2,
-      cliente: 'Laura Fernández',
-      email: 'laura@email.com',
-      estado: 'Aceptada',
-      servicio: 'Servicio de frenos plus',
-      vehiculo: 'Ford Focus 2020',
-      fecha: '14/3/2026',
-      validaHasta: '28/3/2026',
-      manoObra: 1000,
-      refacciones: 1500,
-      total: 2500,
-      avatar: 'L'
-    }
-  ];
-
-  const listaPrecios = [
-    { id: 1, nombre: 'Cambio de aceite y filtro', manoObra: 450, refacciones: 400, total: 850 },
-    { id: 2, nombre: 'Afinación básica', manoObra: 650, refacciones: 890, total: 1540 },
-    { id: 3, nombre: 'Afinación integral', manoObra: 1200, refacciones: 1600, total: 2800 },
-    { id: 4, nombre: 'Servicio de frenos básico', manoObra: 800, refacciones: 1000, total: 1800 },
-    { id: 5, nombre: 'Servicio de frenos plus', manoObra: 1000, refacciones: 1500, total: 2500 }
-  ];
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [serviciosList, setServiciosList] = useState([]);
+  const [loadingQuotes, setLoadingQuotes] = useState(true);
+  const [stats, setStats] = useState({ activas: 0, aceptadas: 0, pendientes: 0, valorTotal: 0 });
 
   // Modal State
   const [newQuoteForm, setNewQuoteForm] = useState({
@@ -61,6 +19,86 @@ export default function Cotizaciones() {
     refacciones: '',
     validaHasta: ''
   });
+
+  const loadCotizaciones = async () => {
+    setLoadingQuotes(true);
+    try {
+      const data = await fetchCotizaciones();
+      const mapped = data.map((item) => ({
+        ...item,
+        id: item.id,
+        cliente: item.cliente || `Cliente ${item.id}`,
+        email: item.email || 'No disponible',
+        servicio: item.servicio || 'Servicio no asignado',
+        vehiculo: item.vehiculo || 'Vehículo no asignado',
+        fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+        validaHasta: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+        manoObra: item.totalEstimado || 0,
+        refacciones: 0,
+        total: item.totalEstimado || 0,
+        avatar: item.cliente ? item.cliente.charAt(0).toUpperCase() : 'C',
+      }));
+      setCotizaciones(mapped);
+      const activas = mapped.length;
+      const aceptadas = mapped.filter((item) => item.estado === 'Aceptada').length;
+      const pendientes = mapped.filter((item) => item.estado === 'Enviada' || item.estado === 'Pendiente').length;
+      const valorTotal = mapped.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      setStats({ activas, aceptadas, pendientes, valorTotal });
+    } catch (error) {
+      console.error('Error cargando cotizaciones:', error);
+      setCotizaciones([]);
+    } finally {
+      setLoadingQuotes(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCotizaciones();
+    fetchServicios().then(data => {
+      // Mapear campos para que coincidan con la lógica del componente
+      const mapped = (data || []).map(s => ({
+        id: s.idservicios,
+        nombre: s.nombre,
+        manoObra: Number(s.mano_obra) || 0,
+        refacciones: Number(s.refacciones_estimadas) || 0,
+        total: (Number(s.mano_obra) || 0) + (Number(s.refacciones_estimadas) || 0)
+      }));
+      setServiciosList(mapped);
+    }).catch(console.error);
+  }, []);
+
+  const handleNewQuoteChange = (field, value) => {
+    setNewQuoteForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateQuote = async () => {
+    const totalEstimado = Number(newQuoteForm.manoObra || 0) + Number(newQuoteForm.refacciones || 0);
+    try {
+      await createCotizacion({
+        idUsuarios: null,
+        idVehiculos: null,
+        idServicios: null,
+        idProductos: null,
+        total_estimado: totalEstimado,
+        fecha: newQuoteForm.validaHasta || new Date().toISOString().slice(0, 10),
+      });
+      setIsModalOpen(false);
+      setNewQuoteForm({
+        cliente: '',
+        email: '',
+        vehiculo: '',
+        servicios: [],
+        manoObra: '',
+        refacciones: '',
+        validaHasta: ''
+      });
+      loadCotizaciones();
+      alert('Cotización creada correctamente.');
+    } catch (error) {
+      console.error('No se pudo crear la cotización:', error);
+      alert('Error al crear la cotización. Intenta de nuevo.');
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -74,14 +112,14 @@ export default function Cotizaciones() {
   return (
     <AdminLayout activeTab="cotizaciones">
       <div className="p-8">
-        
+
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Cotizaciones</h1>
             <p className="text-gray-500">Administra las cotizaciones en el sistema</p>
           </div>
-          <button 
+          <button
             onClick={() => setIsModalOpen(true)}
             className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
           >
@@ -114,14 +152,14 @@ export default function Cotizaciones() {
 
         {/* Main 2-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Left Column: Cotizaciones recientes */}
           <div className="lg:col-span-2">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Cotizaciones recientes</h2>
             <div className="space-y-6">
               {cotizaciones.map(cot => (
                 <div key={cot.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  
+
                   {/* Card Header Profile */}
                   <div className="p-6 pb-4 flex justify-between items-start border-b border-gray-100">
                     <div className="flex gap-4 items-center">
@@ -195,34 +233,7 @@ export default function Cotizaciones() {
           </div>
 
           {/* Right Column: Lista de Precios */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col h-auto max-h-[85vh] sticky top-8">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-gray-900">Lista de precios</h2>
-              </div>
 
-              <div className="p-6 space-y-6 overflow-y-auto flex-1">
-                {listaPrecios.map(item => (
-                  <div key={item.id} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">{item.nombre}</h4>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Mano de obra</span>
-                      <span>${item.manoObra}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-2">
-                      <span>Refacciones</span>
-                      <span>${item.refacciones}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-blue-600 pt-1">
-                      <span>Total</span>
-                      <span>${item.total}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          </div>
 
         </div>
 
@@ -230,7 +241,7 @@ export default function Cotizaciones() {
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              
+
               {/* Modal Header */}
               <div className="px-6 py-4 flex justify-between items-center border-b border-gray-100">
                 <div className="flex items-center gap-2">
@@ -250,18 +261,30 @@ export default function Cotizaciones() {
 
               {/* Modal Body */}
               <div className="p-6 overflow-y-auto space-y-6">
-                
+
                 {/* Información del cliente */}
                 <div>
                   <h4 className="text-sm font-bold text-gray-900 mb-3">Información del cliente</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nombre del cliente *</label>
-                      <input type="text" placeholder="Juan Pérez García" className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                      <input
+                        type="text"
+                        placeholder="Juan Pérez García"
+                        value={newQuoteForm.cliente}
+                        onChange={(e) => handleNewQuoteChange('cliente', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Correo electrónico *</label>
-                      <input type="email" placeholder="juan@email.com" className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                      <input
+                        type="email"
+                        placeholder="juan@email.com"
+                        value={newQuoteForm.email}
+                        onChange={(e) => handleNewQuoteChange('email', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -272,17 +295,23 @@ export default function Cotizaciones() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Vehículo *</label>
-                      <input type="text" placeholder="Toyota Corolla 2020" className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                      <input
+                        type="text"
+                        placeholder="Toyota Corolla 2020"
+                        value={newQuoteForm.vehiculo}
+                        onChange={(e) => handleNewQuoteChange('vehiculo', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Servicios *</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
-                        {listaPrecios.map(s => {
+                        {serviciosList.map(s => {
                           const isSelected = newQuoteForm.servicios?.includes(s.id);
                           return (
                             <label key={s.id} className={`flex items-start gap-2 p-2.5 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                              <input 
-                                type="checkbox" 
+                              <input
+                                type="checkbox"
                                 className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
                                 checked={isSelected || false}
                                 onChange={(e) => {
@@ -290,8 +319,8 @@ export default function Cotizaciones() {
                                   setNewQuoteForm(prev => {
                                     const current = prev.servicios || [];
                                     const newServicios = checked ? [...current, s.id] : current.filter(id => id !== s.id);
-                                    
-                                    const selectedItems = listaPrecios.filter(item => newServicios.includes(item.id));
+
+                                    const selectedItems = serviciosList.filter(item => newServicios.includes(item.id));
                                     const totalManoObra = selectedItems.reduce((acc, item) => acc + item.manoObra, 0);
                                     const totalRefacciones = selectedItems.reduce((acc, item) => acc + item.refacciones, 0);
 
@@ -313,21 +342,38 @@ export default function Cotizaciones() {
                         })}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Mano de obra (MXN) *</label>
-                        <input type="number" placeholder="450" value={newQuoteForm.manoObra} onChange={(e) => setNewQuoteForm({...newQuoteForm, manoObra: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                        <input
+                          type="number"
+                          placeholder="450"
+                          value={newQuoteForm.manoObra}
+                          onChange={(e) => handleNewQuoteChange('manoObra', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Partes y refacciones (MXN) *</label>
-                        <input type="number" placeholder="400" value={newQuoteForm.refacciones} onChange={(e) => setNewQuoteForm({...newQuoteForm, refacciones: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                        <input
+                          type="number"
+                          placeholder="400"
+                          value={newQuoteForm.refacciones}
+                          onChange={(e) => handleNewQuoteChange('refacciones', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Válida hasta *</label>
-                      <input type="date" className="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                      <input
+                        type="date"
+                        value={newQuoteForm.validaHasta}
+                        onChange={(e) => handleNewQuoteChange('validaHasta', e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm text-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
                     </div>
                   </div>
                 </div>
@@ -360,7 +406,7 @@ export default function Cotizaciones() {
                 <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                   Cancelar
                 </button>
-                <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm shadow-purple-200">
+                <button onClick={handleCreateQuote} className="px-5 py-2.5 text-sm font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors shadow-sm shadow-purple-200">
                   Crear cotización
                 </button>
               </div>
@@ -368,7 +414,7 @@ export default function Cotizaciones() {
             </div>
           </div>
         )}
-        
+
       </div>
     </AdminLayout>
   );

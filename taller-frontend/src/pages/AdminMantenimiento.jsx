@@ -1,39 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import {
+  fetchUsers,
+  fetchVehiculos,
+  fetchServicios,
+  fetchProductos,
+  fetchMantenimientos,
+  createMantenimiento,
+  updateMantenimientoEstado
+} from '../utils/api';
 
 export default function AdminMantenimiento() {
-  const [mantenimientos, setMantenimientos] = useState([
-    {
-      id: 1,
-      servicioBase: 'Servicio de frenos básico',
-      vehiculo: 'Toyota Corolla 2020 • ABC-123-XYZ',
-      fecha: '14/2/2026',
-      precioTotal: 1800,
-      estado: 'Completado',
-      propietario: 'María González',
-      kilometraje: '45,230 km',
-      tecnico: 'Juan Pérez',
-      observaciones: 'Se reemplazaron pastillas delanteras y se ajustó sistema de frenos.',
-      partes: ['Pastillas de freno delanteras x1', 'Líquido de frenos DOT 4 x1']
-    }
-  ]);
+  const [mantenimientos, setMantenimientos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const serviciosPredefinidos = [
-    { id: 1, nombre: 'Cambio de aceite y filtro', precio: 450 },
-    { id: 2, nombre: 'Afinación básica', precio: 650 },
-    { id: 3, nombre: 'Servicio de frenos básico', precio: 800 }
-  ];
-
-  const vehiculosMock = [
-    { id: 1, nombre: 'Toyota Corolla 2020 • ABC-123-XYZ' },
-    { id: 2, nombre: 'Honda Civic 2019 • DEF-456-ABC' }
-  ];
-
-  const tecnicosMock = ['Juan Pérez', 'Carlos García', 'Luis Sánchez'];
+  // Catálogos
+  const [clientes, setClientes] = useState([]);
+  const [vehiculosDb, setVehiculosDb] = useState([]);
+  const [serviciosDb, setServiciosDb] = useState([]);
+  const [productosDb, setProductosDb] = useState([]);
+  const [tecnicos, setTecnicos] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
+  
+  // Estado del formulario
   const [nuevo, setNuevo] = useState({
-    vehiculo: '',
+    clienteCorreo: '',
+    idVehiculos: '',
     kilometraje: '',
     tecnico: '',
     estado: 'En proceso',
@@ -42,26 +35,76 @@ export default function AdminMantenimiento() {
   });
 
   const [trabajos, setTrabajos] = useState([]);
-  const [nuevoTrabajo, setNuevoTrabajo] = useState({ servicioId: '', descripcion: '', precio: '' });
-
+  const [nuevoTrabajoId, setNuevoTrabajoId] = useState('');
+  
   const [refacciones, setRefacciones] = useState([]);
-  const [nuevaRefaccion, setNuevaRefaccion] = useState({ nombre: '', cantidad: 1, precio: '' });
+  const [nuevaRefaccion, setNuevaRefaccion] = useState({ id: '', cantidad: 1 });
+
+  const loadData = async () => {
+    try {
+      const [uRes, vRes, sRes, pRes, mRes] = await Promise.all([
+        fetchUsers(),
+        fetchVehiculos(),
+        fetchServicios(),
+        fetchProductos(),
+        fetchMantenimientos()
+      ]);
+      
+      const allUsers = uRes || [];
+      setClientes(allUsers.filter(u => u.role === 'Cliente'));
+      setTecnicos(allUsers.filter(u => u.role === 'Técnico'));
+      setVehiculosDb(vRes || []);
+      setServiciosDb(sRes || []);
+      setProductosDb(pRes || []);
+      setMantenimientos(mRes || []);
+    } catch (err) {
+      console.error('Error loading mantenimiento data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const vehiculosCliente = vehiculosDb.filter(v => v.propietario_correo === nuevo.clienteCorreo);
 
   const handleServicioChange = (e) => {
-    const sId = Number(e.target.value);
-    const srv = serviciosPredefinidos.find(s => s.id === sId);
-    setNuevoTrabajo({
-      ...nuevoTrabajo,
-      servicioId: sId,
-      precio: srv ? srv.precio : ''
-    });
+    setNuevoTrabajoId(e.target.value);
   };
 
   const agregarTrabajo = () => {
-    if (nuevoTrabajo.servicioId && nuevoTrabajo.precio !== '') {
-      const srv = serviciosPredefinidos.find(s => s.id === nuevoTrabajo.servicioId);
-      setTrabajos([...trabajos, { ...nuevoTrabajo, nombre: srv.nombre, id: Date.now() }]);
-      setNuevoTrabajo({ servicioId: '', descripcion: '', precio: '' });
+    if (!nuevoTrabajoId) return;
+    const srv = serviciosDb.find(s => s.id === Number(nuevoTrabajoId));
+    if (srv) {
+      // Evitar duplicados de servicio
+      if (trabajos.find(t => t.id === srv.id)) {
+        alert("El servicio ya fue agregado.");
+        return;
+      }
+
+      setTrabajos([...trabajos, { id: srv.id, nombre: srv.nombre, precio: srv.costo, descripcion: srv.descripcion }]);
+      setNuevoTrabajoId('');
+
+      // Auto-cargar refacciones asociadas al servicio
+      if (srv.refacciones && Array.isArray(srv.refacciones)) {
+        const refsActuales = [...refacciones];
+        srv.refacciones.forEach(sr => {
+          const existe = refsActuales.find(r => r.id === sr.id);
+          if (existe) {
+            existe.cantidad += sr.cantidad;
+          } else {
+            refsActuales.push({
+              id: sr.id,
+              nombre: sr.nombre,
+              precio_unitario: sr.precio_unitario,
+              cantidad: sr.cantidad
+            });
+          }
+        });
+        setRefacciones(refsActuales);
+      }
     }
   };
 
@@ -70,9 +113,16 @@ export default function AdminMantenimiento() {
   };
 
   const agregarRefaccion = () => {
-    if (nuevaRefaccion.nombre && nuevaRefaccion.cantidad && nuevaRefaccion.precio !== '') {
-      setRefacciones([...refacciones, { ...nuevaRefaccion, id: Date.now() }]);
-      setNuevaRefaccion({ nombre: '', cantidad: 1, precio: '' });
+    if (!nuevaRefaccion.id || nuevaRefaccion.cantidad < 1) return;
+    const prod = productosDb.find(p => p.idProductos === Number(nuevaRefaccion.id));
+    if (prod) {
+      const existe = refacciones.find(r => r.id === prod.idProductos);
+      if (existe) {
+        setRefacciones(refacciones.map(r => r.id === prod.idProductos ? { ...r, cantidad: r.cantidad + nuevaRefaccion.cantidad } : r));
+      } else {
+        setRefacciones([...refacciones, { id: prod.idProductos, nombre: prod.nombre, precio_unitario: prod.precio_unitario, cantidad: nuevaRefaccion.cantidad }]);
+      }
+      setNuevaRefaccion({ id: '', cantidad: 1 });
     }
   };
 
@@ -82,46 +132,57 @@ export default function AdminMantenimiento() {
 
   const calcularTotal = () => {
     let totalAct = trabajos.reduce((acc, t) => acc + Number(t.precio), 0);
-    totalAct += refacciones.reduce((acc, r) => acc + (Number(r.cantidad) * Number(r.precio)), 0);
+    totalAct += refacciones.reduce((acc, r) => acc + (Number(r.cantidad) * Number(r.precio_unitario)), 0);
     return totalAct;
   };
 
-  const manejarEnvio = (e) => {
+  const manejarEnvio = async (e) => {
     e.preventDefault();
-    if (!nuevo.vehiculo) return alert("Selecciona un vehículo");
+    if (!nuevo.idVehiculos) return alert("Selecciona un vehículo");
 
-    const servicioBaseName = trabajos.length > 0 ? trabajos[0].nombre : 'Mantenimiento General';
-    const partesArray = refacciones.map(r => `${r.nombre} x${r.cantidad}`);
+    try {
+      const payload = {
+        idVehiculos: nuevo.idVehiculos,
+        tecnico: nuevo.tecnico,
+        kilometraje: nuevo.kilometraje,
+        estado: nuevo.estado,
+        fecha: nuevo.fecha,
+        observaciones: nuevo.observaciones,
+        costo_final: calcularTotal(),
+        servicios: trabajos.map(t => ({ id: t.id, precio: t.precio, descripcion: t.descripcion })),
+        productos: refacciones.map(r => ({ id: r.id, cantidad: r.cantidad, precio: r.precio_unitario }))
+      };
 
-    setMantenimientos([{
-      id: Date.now(),
-      servicioBase: servicioBaseName,
-      vehiculo: nuevo.vehiculo,
-      fecha: nuevo.fecha,
-      precioTotal: calcularTotal(),
-      estado: nuevo.estado,
-      propietario: 'Propietario Demo',
-      kilometraje: nuevo.kilometraje,
-      tecnico: nuevo.tecnico,
-      observaciones: nuevo.observaciones,
-      partes: partesArray
-    }, ...mantenimientos]);
+      await createMantenimiento(payload);
+      await loadData();
+      cerrarModal();
+    } catch (err) {
+      alert(`Error al crear orden: ${err.message}`);
+    }
+  };
 
-    cerrarModal();
+  const toggleEstado = async (mId, actualEstado) => {
+    const nuevoEstado = actualEstado === 'Completado' ? 'En proceso' : 'Completado';
+    try {
+      await updateMantenimientoEstado(mId, nuevoEstado);
+      await loadData();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   const cerrarModal = () => {
     setShowModal(false);
-    setNuevo({ vehiculo: '', kilometraje: '', tecnico: '', estado: 'En proceso', fecha: new Date().toISOString().split('T')[0], observaciones: '' });
+    setNuevo({ clienteCorreo: '', idVehiculos: '', kilometraje: '', tecnico: '', estado: 'En proceso', fecha: new Date().toISOString().split('T')[0], observaciones: '' });
     setTrabajos([]);
     setRefacciones([]);
-    setNuevoTrabajo({ servicioId: '', descripcion: '', precio: '' });
-    setNuevaRefaccion({ nombre: '', cantidad: 1, precio: '' });
+    setNuevoTrabajoId('');
+    setNuevaRefaccion({ id: '', cantidad: 1 });
   };
 
   const totalCompletados = mantenimientos.filter(m => m.estado === 'Completado').length;
   const totalEnProceso = mantenimientos.filter(m => m.estado === 'En proceso').length;
-  const ingresosTotales = mantenimientos.reduce((acc, m) => acc + m.precioTotal, 0);
+  const ingresosTotales = mantenimientos.reduce((acc, m) => acc + Number(m.costo_final || 0), 0);
 
   return (
     <AdminLayout activeTab="mantenimiento">
@@ -159,78 +220,76 @@ export default function AdminMantenimiento() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          {mantenimientos.map(m => (
-            <div key={m.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-left">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-start">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{m.servicioBase}</h3>
-                    <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                      {m.vehiculo}
-                      <span className="text-gray-300">•</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      {m.fecha}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-gray-900 mb-1">${m.precioTotal.toLocaleString()}</div>
-                  <span className={`px-2.5 py-1 rounded text-xs font-semibold ${m.estado === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {m.estado}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-6 bg-gray-50/50 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Información del vehículo</h4>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <p><span className="font-medium">Propietario:</span> {m.propietario}</p>
-                    <p><span className="font-medium">Kilometraje:</span> {m.kilometraje}</p>
-                    <p><span className="font-medium">Técnico:</span> {m.tecnico}</p>
-                  </div>
-
-                  {m.partes.length > 0 && (
-                    <div className="mt-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Partes utilizadas</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {m.partes.map((p, i) => (
-                          <span key={i} className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs items-center justify-center">
-                            {p}
-                          </span>
-                        ))}
+        {loading ? (
+          <div className="text-center py-10 text-gray-500">Cargando reportes de mantenimiento...</div>
+        ) : (
+          <div className="space-y-4">
+            {mantenimientos.map(m => {
+              const servicioBaseName = m.servicios && m.servicios.length > 0 ? m.servicios[0].nombre : 'Mantenimiento General';
+              const partesArray = m.productos ? m.productos.map(p => `${p.nombre} x${p.cantidad}`) : [];
+              
+              return (
+                <div key={m.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-left">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-start">
+                    <div className="flex gap-4">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">{servicioBaseName}</h3>
+                        <div className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                          {m.vehiculo}
+                          <span className="text-gray-300">•</span>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          {new Date(m.fecha).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Observaciones</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {m.observaciones}
-                  </p>
-                </div>
-              </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-gray-900 mb-1">${Number(m.costo_final || 0).toLocaleString()}</div>
+                      <button onClick={() => toggleEstado(m.id, m.estado)} className={`px-2.5 py-1 rounded text-xs font-semibold hover:opacity-80 transition ${m.estado === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {m.estado}
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="p-4 border-t border-gray-100 flex gap-3">
-                <button className="bg-[#1a56db] text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-blue-800 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  Descargar PDF
-                </button>
-                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-200 transition">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  Editar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div className="p-6 bg-gray-50/50 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Información del vehículo</h4>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <p><span className="font-medium">Propietario:</span> {m.cliente_nombre} ({m.cliente_email})</p>
+                        <p><span className="font-medium">Kilometraje:</span> {m.kilometraje}</p>
+                        <p><span className="font-medium">Técnico:</span> {m.tecnico}</p>
+                      </div>
+
+                      {partesArray.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Partes utilizadas</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {partesArray.map((p, i) => (
+                              <span key={i} className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs items-center justify-center">
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Observaciones</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        {m.observaciones || 'Sin observaciones.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showModal && (
@@ -255,29 +314,37 @@ export default function AdminMantenimiento() {
                 <div className="bg-blue-50/30 border border-blue-50 rounded-xl p-6 mb-6">
                   <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-4">
                     <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-                    Información del Vehículo
+                    Información del Cliente y Vehículo
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Seleccionar Vehículo *</label>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Correo del Cliente *</label>
                       <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.vehiculo} onChange={e => setNuevo({ ...nuevo, vehiculo: e.target.value })}>
-                        <option value="">-- Selecciona un vehículo --</option>
-                        {vehiculosMock.map(v => <option key={v.id} value={v.nombre}>{v.nombre}</option>)}
+                        value={nuevo.clienteCorreo} onChange={e => setNuevo({ ...nuevo, clienteCorreo: e.target.value, idVehiculos: '' })}>
+                        <option value="">-- Selecciona un cliente --</option>
+                        {clientes.map(c => <option key={c.email} value={c.email}>{c.name} ({c.email})</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Kilometraje Actual *</label>
-                      <input required type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        value={nuevo.kilometraje} onChange={e => setNuevo({ ...nuevo, kilometraje: e.target.value })} placeholder="Ej: 45,230 km" />
+                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Vehículo Asociado *</label>
+                      <select required disabled={!nuevo.clienteCorreo} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        value={nuevo.idVehiculos} onChange={e => setNuevo({ ...nuevo, idVehiculos: e.target.value })}>
+                        <option value="">-- Selecciona el vehículo --</option>
+                        {vehiculosCliente.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} • {v.placa}</option>)}
+                      </select>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Kilometraje Actual *</label>
+                    <input required type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={nuevo.kilometraje} onChange={e => setNuevo({ ...nuevo, kilometraje: e.target.value })} placeholder="Ej: 45,230 km" />
                   </div>
                 </div>
 
                 <div className="border border-gray-100 rounded-xl p-6 mb-6 shadow-sm">
                   <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-4">
                     <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    Información del Servicio
+                    Detalles del Servicio
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                     <div>
@@ -290,7 +357,7 @@ export default function AdminMantenimiento() {
                       <select required className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                         value={nuevo.tecnico} onChange={e => setNuevo({ ...nuevo, tecnico: e.target.value })}>
                         <option value="">-- Selecciona un técnico --</option>
-                        {tecnicosMock.map(t => <option key={t} value={t}>{t}</option>)}
+                        {tecnicos.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
                       </select>
                     </div>
                     <div>
@@ -307,7 +374,7 @@ export default function AdminMantenimiento() {
                 <div className="bg-green-50/50 border border-green-100 rounded-xl p-6 mb-6">
                   <h3 className="text-sm font-bold text-green-800 flex items-center gap-2 mb-4">
                     <span className="font-bold text-lg leading-none text-green-600">$</span>
-                    Trabajos Realizados
+                    Trabajos Realizados (Servicios)
                   </h3>
 
                   {trabajos.map(t => (
@@ -322,23 +389,15 @@ export default function AdminMantenimiento() {
                   ))}
 
                   <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
-                    <div className="w-full md:w-1/3">
+                    <div className="flex-1 w-full">
                       <select className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
-                        value={nuevoTrabajo.servicioId} onChange={handleServicioChange}>
-                        <option value="">Seleccione un servicio predefinido</option>
-                        {serviciosPredefinidos.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                        value={nuevoTrabajoId} onChange={handleServicioChange}>
+                        <option value="">Seleccione un servicio del catálogo</option>
+                        {serviciosDb.map(s => <option key={s.id} value={s.id}>{s.nombre} (${s.costo})</option>)}
                       </select>
                     </div>
-                    <div className="flex-1 w-full">
-                      <input type="text" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        value={nuevoTrabajo.descripcion} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, descripcion: e.target.value })} placeholder="Descripción adicional" />
-                    </div>
-                    <div className="w-full md:w-32">
-                      <input type="number" className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none"
-                        value={nuevoTrabajo.precio} onChange={e => setNuevoTrabajo({ ...nuevoTrabajo, precio: e.target.value })} placeholder="Precio" />
-                    </div>
                     <button type="button" onClick={agregarTrabajo} className="px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-bold whitespace-nowrap">
-                      +
+                      Agregar Servicio
                     </button>
                   </div>
                 </div>
@@ -347,12 +406,13 @@ export default function AdminMantenimiento() {
                   <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2 mb-4">
                     Partes y Refacciones Utilizadas
                   </h3>
+                  <p className="text-xs text-yellow-700 mb-4 opacity-80">* Las refacciones ligadas a los servicios agregados se precargan automáticamente. Puedes añadir más si fue necesario.</p>
 
                   {refacciones.map(r => (
                     <div key={r.id} className="flex gap-2 mb-3 items-center">
                       <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{r.nombre}</div>
-                      <div className="w-20 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">{r.cantidad}</div>
-                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">${r.precio}</div>
+                      <div className="w-20 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-center">x{r.cantidad}</div>
+                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-right">${(Number(r.precio_unitario) * r.cantidad).toLocaleString()}</div>
                       <button type="button" onClick={() => eliminarRefaccion(r.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -361,19 +421,18 @@ export default function AdminMantenimiento() {
 
                   <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
                     <div className="flex-1 w-full">
-                      <input type="text" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.nombre} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, nombre: e.target.value })} placeholder="Nombre de la parte" />
+                      <select className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none bg-white"
+                        value={nuevaRefaccion.id} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, id: e.target.value })}>
+                        <option value="">Seleccione una refacción del inventario</option>
+                        {productosDb.map(p => <option key={p.idProductos} value={p.idProductos}>{p.nombre} (${p.precio_unitario} - Stock: {p.stock_actual})</option>)}
+                      </select>
                     </div>
                     <div className="w-full md:w-20">
                       <input type="number" min="1" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.cantidad} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, cantidad: e.target.value })} placeholder="1" />
-                    </div>
-                    <div className="w-full md:w-32">
-                      <input type="number" className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none"
-                        value={nuevaRefaccion.precio} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, precio: e.target.value })} placeholder="Precio unitario" />
+                        value={nuevaRefaccion.cantidad} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, cantidad: Number(e.target.value) })} placeholder="Cant." />
                     </div>
                     <button type="button" onClick={agregarRefaccion} className="px-4 py-2.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition font-bold whitespace-nowrap">
-                      +
+                      Añadir Parte
                     </button>
                   </div>
                 </div>
@@ -400,8 +459,8 @@ export default function AdminMantenimiento() {
               <button type="button" onClick={cerrarModal} className="px-6 py-2.5 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                 Cancelar
               </button>
-              <button type="submit" form="mantenimientoForm" className="px-6 py-2.5 text-sm font-bold text-white bg-gray-400 hover:bg-blue-600 rounded-lg transition-colors"
-                style={{ backgroundColor: (nuevo.vehiculo && nuevo.fecha && nuevo.tecnico) ? '#1a56db' : '#cbd5e1' }}>
+              <button type="submit" form="mantenimientoForm" className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!nuevo.idVehiculos || trabajos.length === 0}>
                 Crear Orden
               </button>
             </div>
