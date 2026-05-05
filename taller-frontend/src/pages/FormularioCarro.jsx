@@ -1,25 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AuthContext } from '../context/AuthContext';
 import {
   createCotizacion, createCita,
   fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores,
   fetchServicios,
 } from '../utils/api';
 
-const fechasDisponibles = [
-  { diaSemana: 'MIÉ', dia: '25', mes: 'Mar' },
-  { diaSemana: 'JUE', dia: '26', mes: 'Mar' },
-  { diaSemana: 'VIE', dia: '27', mes: 'Mar' },
-  { diaSemana: 'SÁB', dia: '28', mes: 'Mar' },
-  { diaSemana: 'LUN', dia: '30', mes: 'Mar' },
-  { diaSemana: 'MAR', dia: '31', mes: 'Mar' },
-  { diaSemana: 'MIÉ', dia: '1', mes: 'Abr' },
-  { diaSemana: 'JUE', dia: '2', mes: 'Abr' },
-];
+const generateFechas = () => {
+  const fechas = [];
+  const diasSemana = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+  const mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  
+  let d = new Date();
+  d.setDate(d.getDate() + 1); // Empezar desde mañana
+
+  while (fechas.length < 8) {
+    if (d.getDay() !== 0) { // Omitir domingos
+      fechas.push({
+        diaSemana: diasSemana[d.getDay()],
+        dia: String(d.getDate()),
+        mes: mesesAbrev[d.getMonth()],
+        year: d.getFullYear()
+      });
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return fechas;
+};
+
+const fechasDisponibles = generateFechas();
 
 function FormularioCarro() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { currentUser } = useContext(AuthContext);
 
 
   const [form, setForm] = useState({
@@ -47,18 +62,48 @@ function FormularioCarro() {
   const [modalStep, setModalStep] = useState(1);
   const [selectedFecha, setSelectedFecha] = useState(null);
   const [contactoForm, setContactoForm] = useState({
-    nombre: "",
-    telefono: "",
-    correo: "",
+    nombre: currentUser?.name || currentUser?.nombre || "",
+    telefono: currentUser?.phone || currentUser?.telefono || "",
+    correo: currentUser?.email || currentUser?.correo || "",
     notas: ""
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      setContactoForm(prev => ({
+        ...prev,
+        nombre: currentUser.name || currentUser.nombre || prev.nombre,
+        telefono: currentUser.phone || currentUser.telefono || prev.telefono,
+        correo: currentUser.email || currentUser.correo || prev.correo
+      }));
+    }
+  }, [currentUser]);
 
   // Suma el costo de los servicios seleccionados usando los datos reales del backend
   const getTotalEstimado = () => {
     return form.servicios.reduce((total, nombreServicio) => {
       const s = serviciosDisponibles.find(sv => sv.nombre === nombreServicio);
-      return total + (s?.costo || 0);
+      return total + Number(s?.costo || 0);
     }, 0);
+  };
+
+  const getDesglose = () => {
+    let manoObra = 0;
+    let partes = 0;
+    let tieneRefacciones = false;
+
+    form.servicios.forEach(nombreServicio => {
+      const s = serviciosDisponibles.find(sv => sv.nombre === nombreServicio);
+      if (s) {
+        manoObra += Number(s.manoObra || s.costo || 0); // fallback a costo total si no hay desglose
+        partes += Number(s.refaccionesEstimadas || 0);
+        if (s.refacciones && s.refacciones.length > 0) tieneRefacciones = true;
+      }
+    });
+
+    // Si todo el costo se fue a mano de obra por el fallback, descontamos las partes (si hubiere, pero si hubiere ya tendria manoObra definida normalmente)
+    // Para no duplicar costo si no habia manoObra definida.
+    return { manoObra, partes, tieneRefacciones };
   };
 
   const handleNextStep = () => setModalStep(prev => Math.min(prev + 1, 3));
@@ -89,11 +134,18 @@ function FormularioCarro() {
         fecha: new Date().toISOString().slice(0, 10),
       });
 
+      const meses = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+      const fechaStr = `${selectedFecha.year}-${meses[selectedFecha.mes]}-${selectedFecha.dia.padStart(2, '0')}`;
+
+      const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${form.idanio}`.trim();
+      const serviciosText = form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio General';
+      
       await createCita({
-        idUsuarios: null,
+        idUsuarios: currentUser?.id || null,
         idCotizacion: cotizacion.id,
-        fecha: selectedFecha,
-        nota: contactoForm.notas || `Cliente: ${contactoForm.nombre} - ${contactoForm.correo}`,
+        fecha: fechaStr,
+        hora: '09:00',
+        nota: `Cliente: ${contactoForm.nombre} - ${contactoForm.telefono} | Vehículo: ${vehiculoText} | Servicios: ${serviciosText}` + (contactoForm.notas ? ` | Notas: ${contactoForm.notas}` : ''),
         estado: 'Pendiente'
       });
 
@@ -228,8 +280,8 @@ function FormularioCarro() {
                 >
                   <option value="">Selecciona un año</option>
                   {anio.map((year) => {
-                    const id = year.idanio ?? year.id ?? year.value ?? year.nombre;
-                    const label = year.nombre ?? id;
+                    const id = year.idAnio ?? year.idanio ?? year.id ?? year.value;
+                    const label = year.anio ?? year.nombre ?? id;
                     return <option key={id} value={id}>{label}</option>;
                   })}
                 </select>
@@ -278,8 +330,8 @@ function FormularioCarro() {
                 >
                   <option value="">Selecciona un motor</option>
                   {motores.map((motor) => {
-                    const id = motor.idmotor ?? motor.id ?? motor.value;
-                    const label = motor.cilindrada ?? id;
+                    const id = motor.idmotor ?? motor.idMotores ?? motor.id ?? motor.value;
+                    const label = motor.nombre ?? motor.tipo_motor ?? motor.cilindrada ?? id;
                     return <option key={id} value={id}>{label}</option>;
                   })}
                 </select>
@@ -351,22 +403,22 @@ function FormularioCarro() {
               </div>
               <div className="flex justify-between">
                 <span>Refacciones</span>
-                <span className="font-semibold text-gray-900 text-right">Incluidas</span>
+                <span className="font-semibold text-gray-900 text-right">{getDesglose().tieneRefacciones ? 'Incluidas' : 'No requiere'}</span>
               </div>
               <div className="flex justify-between">
                 <span>Mano de obra</span>
-                <span className="font-semibold text-gray-900">$650 MXN</span>
+                <span className="font-semibold text-gray-900">${getDesglose().manoObra} MXN</span>
               </div>
               <div className="flex justify-between">
                 <span>Partes y consumibles</span>
-                <span className="font-semibold text-gray-900">$890 MXN</span>
+                <span className="font-semibold text-gray-900">${getDesglose().partes} MXN</span>
               </div>
             </div>
 
             <div className="border-t border-gray-100 pt-6">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-gray-700 font-semibold">Total estimado</span>
-                <span className="text-3xl font-light text-[#1A56DB]">$1540 MXN</span>
+                <span className="text-3xl font-light text-[#1A56DB]">${getTotalEstimado()} MXN</span>
               </div>
               <p className="text-xs text-gray-400">
                 El total puede ajustarse tras la revisión física del vehículo. El cliente puede consultar esta cotización y decidir si agenda la cita.
@@ -507,6 +559,19 @@ function FormularioCarro() {
                   <div className="w-full bg-white rounded-xl border border-gray-200 overflow-hidden text-left mb-6 shadow-sm">
 
                     <div className="p-5 border-b border-gray-100">
+                      <div className="text-sm font-medium text-gray-500 mb-2">Vehículo</div>
+                      <div className="text-base font-semibold text-gray-900 flex flex-col gap-1">
+                        <span>
+                          {marca.find(m => String(m.idmarca) === String(form.idmarca))?.nombre || 'Marca'} {modelos.find(m => String(m.idmodelo) === String(form.idmodelo))?.nombre || 'Modelo'} {anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.anio || anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.nombre || form.idanio || 'Año'}
+                        </span>
+                        <span className="text-sm font-normal text-gray-600">
+                          {form.idmotor ? `Motor: ${motores.find(m => String(m.idmotor || m.idMotores || m.id || m.value) === String(form.idmotor))?.nombre || form.idmotor} | ` : ''} 
+                          Kilometraje: {form.kilometraje || 'No especificado'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 border-b border-gray-100">
                       <div className="text-sm font-medium text-gray-500 mb-2">Servicios</div>
                       <div className="text-base font-semibold text-gray-900">
                         {form.servicios?.length > 0 ? (
@@ -523,7 +588,7 @@ function FormularioCarro() {
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-3 text-sm font-semibold text-gray-800">
                           <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          {selectedFecha ? `${selectedFecha.diaSemana.toLowerCase()}., ${selectedFecha.dia} de ${selectedFecha.mes.toLowerCase()} de 2026` : 'Fecha no seleccionada'}
+                          {selectedFecha ? `${selectedFecha.diaSemana.toLowerCase()}., ${selectedFecha.dia} de ${selectedFecha.mes.toLowerCase()} de ${selectedFecha.year}` : 'Fecha no seleccionada'}
                         </div>
                       </div>
                     </div>

@@ -42,8 +42,11 @@ function App() {
  
       {showMainNav && (
         <nav className="bg-blue-950 text-white px-4 py-2 flex gap-4 items-center text-lg justify-between">
-          <Link to="/" className="flex items-center">
+          <Link to="/" className="flex items-center gap-3">
             <img src={logo} alt="Logo San Jorge" className="h-12" />
+            {currentUser && currentUser.name && (
+              <span className="font-semibold text-white/90 text-base border-l border-white/20 pl-3 hidden sm:inline-block">Hola, {currentUser.name.split(' ')[0]}</span>
+            )}
           </Link>
           <div className="nav-links">
             <Link to="/">Inicio</Link>  

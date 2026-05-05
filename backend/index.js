@@ -40,6 +40,7 @@ const mantenimientoRoutes = require('./routes/mantenimientoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const proveedorRoutes = require('./routes/proveedorRoutes');
 const compraRoutes = require('./routes/compraRoutes');
+const reportesRoutes = require('./routes/reportes');
 
 const app = express();
 app.use(cors());
@@ -494,6 +495,7 @@ app.use('/api', vehiculoRoutes); // Maneja /api/anio, /api/modelo/:idmarca, /api
 app.use('/api/cliente', clienteRoutes);
 
 // Nuevas Rutas (Preparadas para conectarse después)
+app.use('/api/citas', citaRoutes);
 app.use('/api/productos', productoRoutes);
 app.use('/api/servicios', servicioRoutes);
 app.use('/api/cotizaciones', cotizacionRoutes);
@@ -504,6 +506,7 @@ app.use('/api/ventas', ventaRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/compras', compraRoutes);
+app.use('/api/reportes', reportesRoutes);
 
 // ---------------------------------------------------------------------------
 // Endpoints de Roles (CRUD inline)

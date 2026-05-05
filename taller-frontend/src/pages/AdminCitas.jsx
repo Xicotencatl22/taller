@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-import { fetchCitas, updateCita, createCita, fetchServicios } from '../utils/api';
+import { fetchCitas, updateCita, createCita, fetchServicios, fetchVehiculos, createCotizacion, deleteCita } from '../utils/api';
 
+const generateFechas = () => {
+  const fechas = [];
+  const diasSemana = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+  const mesesAbrev = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  
+  let d = new Date();
+  d.setDate(d.getDate() + 1); // Empezar desde mañana
 
+  while (fechas.length < 8) {
+    if (d.getDay() !== 0) { // Omitir domingos
+      fechas.push({
+        diaSemana: diasSemana[d.getDay()],
+        dia: String(d.getDate()),
+        mes: mesesAbrev[d.getMonth()],
+        year: d.getFullYear()
+      });
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return fechas;
+};
+
+const fechasDisponibles = generateFechas();
 export default function AdminCitas() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState(1);
@@ -10,18 +32,54 @@ export default function AdminCitas() {
   // Appointments state
   const [citas, setCitas] = useState([]);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+  const [allVehicles, setAllVehicles] = useState([]);
 
   const loadCitas = async () => {
     try {
       const data = await fetchCitas();
-      const enriched = data.map((item) => ({
-        ...item,
-        avatar: item.cliente ? item.cliente.charAt(0).toUpperCase() : 'C',
-        estado: item.estado || 'Pendiente',
-        fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
-        hora: item.hora || 'Sin hora',
-        costo: item.costo || 0,
-      }));
+      const enriched = data.map((item) => {
+        let extrCliente = item.cliente;
+        let extrVehiculo = item.vehiculo;
+        let extrServicio = item.servicio;
+        let extrTelefono = item.telefono;
+        let extrEmail = item.email;
+
+        if (item.nota && item.nota.includes('Cliente:')) {
+           const parts = item.nota.split(' | ');
+           parts.forEach(p => {
+             if (p.startsWith('Cliente:')) {
+               const cInfo = p.replace('Cliente:', '').split('-');
+               if (!item.cliente || item.cliente === 'Cliente sin nombre') extrCliente = cInfo[0].trim();
+               if (!item.telefono && cInfo[1]) {
+                   const t = cInfo[1].trim();
+                   if (t.includes('@')) extrEmail = t; else extrTelefono = t;
+               }
+             }
+             if (p.startsWith('Vehículo:')) {
+               if (!item.vehiculo || item.vehiculo === 'Vehículo no definido' || !item.vehiculo.trim()) extrVehiculo = p.replace('Vehículo:', '').trim();
+             }
+             if (p.startsWith('Servicios:')) {
+               if (!item.servicio || item.servicio === 'Servicio no definido') extrServicio = p.replace('Servicios:', '').trim();
+             }
+           });
+        }
+
+        const finalCliente = extrCliente && extrCliente.trim() !== '' ? extrCliente : 'Cliente sin nombre';
+
+        return {
+          ...item,
+          cliente: finalCliente,
+          vehiculo: extrVehiculo || 'Vehículo no definido',
+          servicio: extrServicio || 'Servicio no definido',
+          telefono: extrTelefono || '',
+          email: extrEmail || '',
+          avatar: finalCliente.charAt(0).toUpperCase(),
+          estado: item.estado || 'Pendiente',
+          fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+          hora: item.hora || 'Sin hora',
+          costo: item.costo || 0,
+        };
+      });
       setCitas(enriched);
     } catch (error) {
       console.error('Error cargando citas:', error);
@@ -34,6 +92,9 @@ export default function AdminCitas() {
     fetchServicios()
       .then(data => setServiciosDisponibles(data || []))
       .catch(() => setServiciosDisponibles([]));
+    fetchVehiculos()
+      .then(data => setAllVehicles(data || []))
+      .catch(() => setAllVehicles([]));
   }, []);
 
   const handleUpdateCita = async (id, updates) => {
@@ -46,8 +107,20 @@ export default function AdminCitas() {
     }
   };
 
+  const handleDeleteCita = async (id) => {
+    if (window.confirm("¿Estás seguro de que deseas eliminar esta cita permanentemente? Esta acción no se puede deshacer.")) {
+      try {
+        await deleteCita(id);
+        loadCitas();
+      } catch (err) {
+        console.error(err);
+        alert('Error al eliminar la cita.');
+      }
+    }
+  };
+
   // Modal State
-  const [selectedFecha, setSelectedFecha] = useState('');
+  const [selectedFecha, setSelectedFecha] = useState(null);
   const [selectedHora, setSelectedHora] = useState('');
   const [formData, setFormData] = useState({
     nombre: '',
@@ -60,6 +133,10 @@ export default function AdminCitas() {
     servicios: [],
     notas: ''
   });
+  const [clientVehicles, setClientVehicles] = useState([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [editingCitaId, setEditingCitaId] = useState(null);
+  const [viewingCita, setViewingCita] = useState(null);
 
   const getBadgeColor = (estado) => {
     switch (estado) {
@@ -78,23 +155,117 @@ export default function AdminCitas() {
     setIsModalOpen(false);
     setTimeout(() => {
       setModalStep(1);
-      setSelectedFecha('');
+      setSelectedFecha(null);
       setSelectedHora('');
       setFormData({ nombre: '', telefono: '', email: '', marca: '', modelo: '', ano: '', placa: '', servicios: [], notas: '' });
+      setClientVehicles([]);
+      setSelectedVehicleId('');
+      setEditingCitaId(null);
     }, 300);
+  };
+
+  const handleEditCitaClick = (cita) => {
+    setEditingCitaId(cita.id);
+    
+    let extrMarca = '';
+    let extrModelo = '';
+    let extrAno = '';
+    let extrNotas = '';
+    let extrServicios = [];
+
+    if (cita.nota) {
+      const p = cita.nota.split(' | ');
+      p.forEach(part => {
+          if (part.startsWith('Vehículo:')) {
+              const vRaw = part.replace('Vehículo:', '').trim().split(' ');
+              extrAno = vRaw.pop() || '';
+              extrModelo = vRaw.pop() || '';
+              extrMarca = vRaw.join(' ') || '';
+          }
+          if (part.startsWith('Servicios:')) {
+              extrServicios = part.replace('Servicios:', '').split(',').map(s => s.trim());
+          }
+          if (part.startsWith('Notas:')) {
+              extrNotas = part.replace('Notas:', '').trim();
+          }
+      });
+    }
+
+    if (!extrMarca && cita.vehiculo !== 'Vehículo no definido') {
+      const vRaw = cita.vehiculo.split(' ');
+      extrAno = vRaw.pop() || '';
+      extrModelo = vRaw.pop() || '';
+      extrMarca = vRaw.join(' ') || '';
+    }
+
+    setFormData({
+      nombre: cita.cliente !== 'Cliente sin nombre' ? cita.cliente : '',
+      telefono: cita.telefono || '',
+      email: cita.email || '',
+      marca: extrMarca,
+      modelo: extrModelo,
+      ano: extrAno,
+      placa: '',
+      servicios: extrServicios.length > 0 ? extrServicios : (cita.servicio !== 'Servicio no definido' ? [cita.servicio] : []),
+      notas: extrNotas !== 'Requiere revisión de administrador' ? extrNotas : ''
+    });
+
+    if (cita.fecha && cita.fecha !== 'Sin fecha') {
+      const parts = cita.fecha.split('/'); 
+      if (parts.length === 3) {
+        const m = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' };
+        setSelectedFecha({
+          dia: parts[0].padStart(2, '0'),
+          mes: m[parts[1].padStart(2, '0')] || 'Ene',
+          year: parts[2],
+          diaSemana: 'DÍA'
+        });
+      }
+    }
+    
+    setModalStep(2);
+    setIsModalOpen(true);
   };
 
   const handleConfirmarCita = async () => {
     try {
-      await createCita({
-        idUsuarios: null,
-        idCotizacion: null,
-        fecha: selectedFecha || null,
-        hora: selectedHora || null,
-        nota: formData.notas || `Cliente: ${formData.nombre} - ${formData.email}`,
-        estado: 'Pendiente',
-      });
-      alert('¡Cita agendada exitosamente!');
+      const meses = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+      const fechaStr = selectedFecha ? `${selectedFecha.year}-${meses[selectedFecha.mes]}-${selectedFecha.dia.padStart(2, '0')}` : null;
+
+      const newNota = `Cliente: ${formData.nombre} - ${formData.telefono} | Vehículo: ${formData.marca} ${formData.modelo} ${formData.ano} | Servicios: ${formData.servicios.join(', ')}` + (formData.notas ? ` | Notas: ${formData.notas}` : '');
+
+      if (editingCitaId) {
+        await updateCita(editingCitaId, {
+          nota: newNota,
+          fecha: fechaStr || undefined
+        });
+        alert('¡Datos actualizados exitosamente!');
+      } else {
+        const totalEstimado = formData.servicios.reduce((total, sName) => {
+          const s = serviciosDisponibles.find(sv => sv.nombre === sName);
+          return total + Number(s?.costo || 0);
+        }, 0);
+
+        const cotizacion = await createCotizacion({
+          idUsuarios: null,
+          idVehiculos: null,
+          idServicios: null,
+          idProductos: null,
+          total_estimado: totalEstimado,
+          fecha: fechaStr || new Date().toISOString().slice(0, 10),
+        });
+
+        await createCita({
+          idUsuarios: null,
+          idCotizacion: cotizacion.id,
+          fecha: fechaStr,
+          hora: '09:00',
+          nota: newNota,
+          estado: 'Pendiente',
+        });
+        alert('¡Cita agendada exitosamente!');
+      }
+      
       handleCloseModal();
       loadCitas();
     } catch (err) {
@@ -196,12 +367,10 @@ export default function AdminCitas() {
                   <div className="text-sm font-medium text-gray-800">{cita.servicio}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Fecha y hora</div>
+                  <div className="text-xs text-gray-400 font-semibold mb-1 uppercase tracking-wider">Fecha programada</div>
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
-                    {cita.fecha} <span className="mx-1 text-gray-300">|</span> 
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    {cita.hora}
+                    {cita.fecha}
                   </div>
                 </div>
                 <div>
@@ -213,13 +382,13 @@ export default function AdminCitas() {
               {/* Bottom Actions Row */}
               <div className="flex justify-between items-center relative z-10">
                 <div className="flex gap-2">
-                  <button onClick={() => window.alert(`Detalles de la Cita:\n\nCliente: ${cita.cliente}\nCorreo: ${cita.email || 'N/A'}\nTeléfono: ${cita.telefono || 'N/A'}\n\nVehículo: ${cita.vehiculo}\nServicio: ${cita.servicio}\n\nFecha Programada: ${cita.fecha} a las ${cita.hora}\nCosto Estimado: $${cita.costo}\nEstado: ${cita.estado}`)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Ver detalles</button>
+                  <button onClick={() => setViewingCita(cita)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Ver detalles</button>
                   <button onClick={() => handleUpdateCita(cita.id, { estado: 'Confirmada' })} className="bg-[#10b981] hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Confirmar</button>
                   <button onClick={() => handleUpdateCita(cita.id, { estado: 'Reagendada' })} className="bg-[#f59e0b] hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reagendar</button>
-                  <button onClick={() => handleUpdateCita(cita.id, { nota: 'Requiere revisión de administrador' })} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Editar</button>
+                  <button onClick={() => handleEditCitaClick(cita)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Editar</button>
                 </div>
-                <button onClick={() => handleUpdateCita(cita.id, { estado: 'Cancelada' })} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
-                  Cancelar cita
+                <button onClick={() => handleDeleteCita(cita.id)} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
+                  Eliminar cita
                 </button>
               </div>
 
@@ -240,7 +409,7 @@ export default function AdminCitas() {
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
               
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Agendar nueva cita</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-6">{editingCitaId ? 'Actualizar cita' : 'Agendar nueva cita'}</h2>
               
               <div className="flex justify-center items-center max-w-xl mx-auto">
                 {/* Step 1 */}
@@ -248,7 +417,7 @@ export default function AdminCitas() {
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${modalStep > 1 ? 'bg-green-500 text-white' : 'bg-blue-600 text-white'}`}>
                     {modalStep > 1 ? '✓' : '1'}
                   </div>
-                  <span className={`text-sm font-semibold ${modalStep > 1 ? 'text-green-500' : 'text-blue-600'}`}>Fecha y hora</span>
+                  <span className={`text-sm font-semibold ${modalStep > 1 ? 'text-green-500' : 'text-blue-600'}`}>Fecha</span>
                 </div>
                 <div className={`flex-1 h-px mx-4 ${modalStep >= 2 ? 'bg-green-500' : 'bg-gray-200'}`}></div>
                 
@@ -272,28 +441,34 @@ export default function AdminCitas() {
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 relative">
               
-              {/* --- STEP 1: Fecha y hora --- */}
+              {/* --- STEP 1: Fecha --- */}
               {modalStep === 1 && (
-                <div className="max-w-lg mx-auto space-y-6">
-                  <h3 className="text-sm font-bold text-gray-700 mb-2">Fecha y hora de la cita</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Fecha *</label>
-                      <input
-                        type="date"
-                        value={selectedFecha}
-                        onChange={e => setSelectedFecha(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
+                <div className="max-w-md mx-auto space-y-6">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 ring-8 ring-blue-50/50">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                      </svg>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hora</label>
-                      <input
-                        type="time"
-                        value={selectedHora}
-                        onChange={e => setSelectedHora(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                      />
+                    <h3 className="text-xl font-bold text-gray-900">Selecciona la fecha</h3>
+                    <p className="text-sm text-gray-500 mt-2">¿Para cuándo deseas agendar el vehículo en el taller?</p>
+                  </div>
+                  
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:border-blue-300 transition-colors">
+                    <label className="block text-sm font-bold text-gray-700 mb-3 text-center">Fecha programada *</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                      {fechasDisponibles.map((f, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setSelectedFecha(f)}
+                          className={`p-4 rounded-xl border-2 text-center transition-all ${selectedFecha?.dia === f.dia ? 'border-[#1A56DB] bg-blue-50/20' : 'border-gray-100/80 hover:border-gray-300 bg-white'}`}
+                        >
+                          <div className="text-xs font-bold mb-1 text-gray-500">{f.diaSemana}</div>
+                          <div className="text-2xl font-black mb-1 text-gray-900">{f.dia}</div>
+                          <div className="text-sm font-medium text-gray-500">{f.mes}</div>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -327,13 +502,100 @@ export default function AdminCitas() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
                         Correo electrónico (opcional)
                       </label>
-                      <input type="email" placeholder="juan@email.com" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      <input 
+                        type="email" 
+                        placeholder="juan@email.com" 
+                        value={formData.email} 
+                        onChange={e => {
+                          const newEmail = e.target.value;
+                          setFormData(prev => ({ ...prev, email: newEmail }));
+                          
+                          if (newEmail.length > 5) {
+                            const matched = allVehicles.filter(v => v.propietario_correo?.toLowerCase() === newEmail.trim().toLowerCase());
+                            setClientVehicles(matched);
+                            
+                            if (matched.length === 1) {
+                              const v = matched[0];
+                              setFormData(prev => ({
+                                ...prev,
+                                nombre: v.propietario_nombre || v.propietario || prev.nombre,
+                                telefono: v.propietario_telefono || prev.telefono,
+                                marca: v.marca || prev.marca,
+                                modelo: v.modelo || prev.modelo,
+                                ano: v.año || v.anio || prev.ano,
+                                placa: v.placas || v.placa || prev.placa,
+                              }));
+                              setSelectedVehicleId(v.idVehiculos || v.id || '1');
+                            } else if (matched.length > 1) {
+                              const v = matched[0];
+                              setFormData(prev => ({
+                                ...prev,
+                                nombre: v.propietario_nombre || v.propietario || prev.nombre,
+                                telefono: v.propietario_telefono || prev.telefono,
+                                marca: '', modelo: '', ano: '', placa: ''
+                              }));
+                              setSelectedVehicleId('');
+                            } else {
+                              setClientVehicles([]);
+                              setSelectedVehicleId('');
+                            }
+                          } else {
+                            setClientVehicles([]);
+                            setSelectedVehicleId('');
+                          }
+                        }} 
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
+                      />
                     </div>
                   </div>
 
                   {/* Info Vehículo */}
                   <div>
                     <h3 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Información del vehículo</h3>
+                    
+                    {clientVehicles.length > 1 && (
+                      <div className="mb-6 bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm">
+                        <label className="flex items-center gap-2 text-sm font-bold text-blue-900 mb-3">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677h3.351a.75.75 0 01.696.471z" /></svg>
+                          Vehículos registrados
+                        </label>
+                        <p className="text-xs text-blue-700 mb-3">Este cliente tiene múltiples vehículos. Selecciona uno para la cita:</p>
+                        <select 
+                          value={selectedVehicleId} 
+                          onChange={(e) => {
+                            const vId = e.target.value;
+                            setSelectedVehicleId(vId);
+                            if (vId === 'nuevo' || vId === '') {
+                               setFormData(prev => ({...prev, marca: '', modelo: '', ano: '', placa: ''}));
+                            } else {
+                               const v = clientVehicles.find(veh => String(veh.idVehiculos || veh.id || veh.placas) === String(vId));
+                               if (v) {
+                                 setFormData(prev => ({
+                                    ...prev,
+                                    marca: v.marca || '',
+                                    modelo: v.modelo || '',
+                                    ano: v.año || v.anio || '',
+                                    placa: v.placas || v.placa || ''
+                                 }));
+                               }
+                            }
+                          }}
+                          className="w-full border border-blue-200 rounded-lg p-3 text-sm text-blue-900 bg-white focus:ring-2 focus:ring-blue-400 outline-none font-medium"
+                        >
+                          <option value="">-- Selecciona un vehículo --</option>
+                          {clientVehicles.map((v, i) => {
+                             const uniqueId = v.idVehiculos || v.id || v.placas || i;
+                             return (
+                               <option key={uniqueId} value={uniqueId}>
+                                 {v.marca} {v.modelo} {v.año || v.anio} ({v.placas || v.placa || 'Sin placa'})
+                               </option>
+                             );
+                          })}
+                          <option value="nuevo">+ Registrar nuevo vehículo para esta cita</option>
+                        </select>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Marca *</label>
@@ -399,15 +661,15 @@ export default function AdminCitas() {
                   <div className="w-16 h-16 bg-green-50 text-[#10b981] rounded-full flex items-center justify-center mb-4 ring-8 ring-green-50/50">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-8">Confirmar cita</h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-8">{editingCitaId ? 'Confirmar actualización' : 'Confirmar cita'}</h3>
 
                   <div className="w-full bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-inner">
                     
                     <div className="pb-4 mb-4 border-b border-gray-200">
-                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Fecha y hora</div>
+                      <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Fecha programada</div>
                       <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
                         <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        {selectedFecha ? `${selectedFecha} ${selectedHora ? '- ' + selectedHora : ''}` : 'Fecha no seleccionada'}
+                        {selectedFecha ? `${selectedFecha.diaSemana.toLowerCase()}., ${selectedFecha.dia} de ${selectedFecha.mes.toLowerCase()} de ${selectedFecha.year}` : 'Fecha no seleccionada'}
                       </div>
                     </div>
 
@@ -478,13 +740,124 @@ export default function AdminCitas() {
               ) : (
                 <button
                   onClick={handleConfirmarCita}
-                  className="px-6 py-2 rounded-lg text-sm font-bold bg-[#10b981] hover:bg-emerald-600 text-white transition-all shadow-sm"
+                  className={`px-6 py-2 rounded-lg text-sm font-bold text-white transition-all shadow-sm ${editingCitaId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#10b981] hover:bg-emerald-600'}`}
                 >
-                  Confirmar cita
+                  {editingCitaId ? 'Actualizar datos' : 'Confirmar cita'}
                 </button>
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Ver Detalles */}
+      {viewingCita && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative">
+            
+            {/* Header decorativo */}
+            <div className={`h-24 absolute top-0 w-full ${getBadgeColor(viewingCita.estado).split(' ')[0]} opacity-20`}></div>
+            
+            <button onClick={() => setViewingCita(null)} className="absolute right-5 top-5 z-10 text-gray-500 hover:text-gray-800 bg-white/50 rounded-full p-1 backdrop-blur-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            <div className="p-8 relative z-10 pt-10">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex gap-4 items-center">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-3xl shadow-lg shadow-blue-600/30">
+                    {viewingCita.avatar}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 leading-none mb-1">{viewingCita.cliente}</h2>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold inline-block mt-2 ${getBadgeColor(viewingCita.estado)}`}>
+                      Estado: {viewingCita.estado}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                
+                {/* Contacto */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Contacto</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 border border-gray-200">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.896-1.596-5.21-3.91-6.805-6.805l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" /></svg>
+                      </div>
+                      {viewingCita.telefono || 'Sin teléfono'}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 border border-gray-200">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                      </div>
+                      {viewingCita.email || 'Sin correo electrónico'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fecha y Costo */}
+                <div>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Detalles de Agendado</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-blue-500 border border-blue-100">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      </div>
+                      {viewingCita.fecha} a las {viewingCita.hora}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm font-bold text-green-600">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-green-500 border border-green-200">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                      Costo estimado: ${viewingCita.costo}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Vehículo */}
+                <div className="md:col-span-2 pt-4 border-t border-gray-200">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Vehículo</h4>
+                  <div className="text-base font-bold text-gray-800 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677h3.351a.75.75 0 01.696.471z" /></svg>
+                    {viewingCita.vehiculo}
+                  </div>
+                </div>
+
+                {/* Servicios */}
+                <div className="md:col-span-2 pt-4 border-t border-gray-200">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Servicios solicitados</h4>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {viewingCita.servicio.split(',').map((s, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-blue-100 text-blue-800 text-sm font-semibold rounded-lg border border-blue-200">
+                        {s.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Notas */}
+                {viewingCita.nota && viewingCita.nota.includes('Notas:') && (
+                  <div className="md:col-span-2 pt-4 border-t border-gray-200">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Notas adicionales</h4>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 text-sm text-gray-600 italic">
+                      "{viewingCita.nota.split('Notas:')[1].trim()}"
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button onClick={() => setViewingCita(null)} className="px-6 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-bold hover:bg-black transition-colors shadow-lg shadow-gray-900/30">
+                  Cerrar detalles
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
       )}

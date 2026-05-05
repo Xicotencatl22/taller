@@ -37,15 +37,18 @@ const getCotizaciones = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT
-         idCotizacion AS id,
-         idUsuarios,
-         idVehiculos,
-         idServicios,
-         idProductos,
-         total_estimado AS totalEstimado,
-         fecha
-       FROM Cotizacion
-       ORDER BY idCotizacion DESC`
+         c.idcotizacion AS id,
+         c.idusuarios,
+         c.idvehiculos,
+         c.idservicios,
+         c.idproductos,
+         c.total_estimado AS "totalEstimado",
+         c.fecha,
+         COALESCE(c.detalles, ci.nota) AS detalles,
+         COALESCE(c.estado, ci.estado) AS estado
+       FROM cotizacion c
+       LEFT JOIN cita ci ON ci.idcotizacion = c.idcotizacion
+       ORDER BY c.idcotizacion DESC`
     );
     res.json(result.rows);
   } catch (err) {
@@ -74,15 +77,18 @@ const getCotizacionById = async (req, res) => {
     const { id } = req.params;
     const result = await pool.query(
       `SELECT
-         idCotizacion AS id,
-         idUsuarios,
-         idVehiculos,
-         idServicios,
-         idProductos,
-         total_estimado AS totalEstimado,
-         fecha
-       FROM Cotizacion
-       WHERE idCotizacion = $1`,
+         c.idcotizacion AS id,
+         c.idusuarios,
+         c.idvehiculos,
+         c.idservicios,
+         c.idproductos,
+         c.total_estimado AS "totalEstimado",
+         c.fecha,
+         COALESCE(c.detalles, ci.nota) AS detalles,
+         COALESCE(c.estado, ci.estado) AS estado
+       FROM cotizacion c
+       LEFT JOIN cita ci ON ci.idcotizacion = c.idcotizacion
+       WHERE c.idcotizacion = $1`,
       [id]
     );
 
@@ -129,21 +135,23 @@ const createCotizacion = async (req, res) => {
       idProductos,
       total_estimado,
       fecha,
+      detalles,
+      estado
     } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO Cotizacion
-         (idUsuarios, idVehiculos, idServicios, idProductos, total_estimado, fecha)
+      `INSERT INTO cotizacion
+         (idusuarios, idvehiculos, idservicios, idproductos, total_estimado, fecha, detalles, estado)
        VALUES
-         ($1, $2, $3, $4, $5, $6)
+         ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING
-         idCotizacion AS id,
-         idUsuarios,
-         idVehiculos,
-         idServicios,
-         idProductos,
-         total_estimado AS totalEstimado,
-         fecha`,
+         idcotizacion AS id,
+         idusuarios,
+         idvehiculos,
+         idservicios,
+         idproductos,
+         total_estimado AS "totalEstimado",
+         fecha, detalles, estado`,
       [
         idUsuarios || null,
         idVehiculos || null,
@@ -151,6 +159,8 @@ const createCotizacion = async (req, res) => {
         idProductos || null,
         total_estimado || 0,
         fecha || new Date().toISOString().slice(0, 10),
+        detalles || null,
+        estado || 'Pendiente'
       ]
     );
 
@@ -190,25 +200,29 @@ const updateCotizacion = async (req, res) => {
       idProductos,
       total_estimado,
       fecha,
+      detalles,
+      estado
     } = req.body;
 
     const result = await pool.query(
-      `UPDATE Cotizacion SET
-         idUsuarios = $1,
-         idVehiculos = $2,
-         idServicios = $3,
-         idProductos = $4,
+      `UPDATE cotizacion SET
+         idusuarios = $1,
+         idvehiculos = $2,
+         idservicios = $3,
+         idproductos = $4,
          total_estimado = $5,
-         fecha = $6
-       WHERE idCotizacion = $7
+         fecha = $6,
+         detalles = $7,
+         estado = $8
+       WHERE idcotizacion = $9
        RETURNING
-         idCotizacion AS id,
-         idUsuarios,
-         idVehiculos,
-         idServicios,
-         idProductos,
-         total_estimado AS totalEstimado,
-         fecha`,
+         idcotizacion AS id,
+         idusuarios,
+         idvehiculos,
+         idservicios,
+         idproductos,
+         total_estimado AS "totalEstimado",
+         fecha, detalles, estado`,
       [
         idUsuarios || null,
         idVehiculos || null,
@@ -216,6 +230,8 @@ const updateCotizacion = async (req, res) => {
         idProductos || null,
         total_estimado || 0,
         fecha || new Date().toISOString().slice(0, 10),
+        detalles || null,
+        estado || 'Pendiente',
         id,
       ]
     );
@@ -248,7 +264,7 @@ const updateCotizacion = async (req, res) => {
 const deleteCotizacion = async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM Cotizacion WHERE idCotizacion = $1', [id]);
+    await pool.query('DELETE FROM cotizacion WHERE idcotizacion = $1', [id]);
     res.json({ message: `Cotización ${id} eliminada` });
   } catch (err) {
     res.status(500).json({ error: err.message });

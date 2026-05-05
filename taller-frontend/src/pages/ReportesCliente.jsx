@@ -1,31 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import logo from '../assets/logg.png';
+import { fetchMantenimientos } from '../utils/api';
+import { AuthContext } from '../context/AuthContext';
 
 export default function ReportesCliente() {
-  const serviciosVehiculo = [
-    {
-      id: 1,
-      titulo: 'Servicio de frenos básico',
-      fecha: '14 de febrero de 2026',
-      kilometraje: '45,230 km',
-      tecnico: 'Juan Pérez',
-      observaciones: 'Se reemplazaron pastillas delanteras y se ajustó sistema de frenos. Todo en óptimas condiciones.',
-      costo: '$1800 MXN',
-      refacciones: ['Pastillas de freno delanteras', 'Líquido de frenos DOT 4']
-    },
-    {
-      id: 2,
-      titulo: 'Cambio de aceite y filtro',
-      fecha: '19 de noviembre de 2025',
-      kilometraje: '42,100 km',
-      tecnico: 'Carlos Ramírez',
-      observaciones: 'Cambio de aceite sintético 5W-30 y filtro de aceite. Revisión general sin anomalías.',
-      costo: '$850 MXN',
-      refacciones: ['Aceite sintético 5W-30 (4L)', 'Filtro de aceite', 'Filtro de aire']
-    }
-  ];
-
+  const { currentUser } = useContext(AuthContext);
+  const [serviciosVehiculo, setServiciosVehiculo] = useState([]);
   const [printingServiceId, setPrintingServiceId] = useState(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    fetchMantenimientos()
+      .then(data => {
+        const completados = data.filter(m => m.estado === 'Completado' && m.cliente_email === currentUser.email);
+        const mapped = completados.map(m => ({
+          id: m.id,
+          titulo: m.servicios && m.servicios.length > 0 
+            ? m.servicios.map(s => s.nombre).join(', ') 
+            : 'Mantenimiento General',
+          fecha: new Date(m.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }),
+          kilometraje: `${m.kilometraje || 0} km`,
+          tecnico: m.tecnico || 'Técnico asignado',
+          observaciones: m.observaciones || 'Servicio realizado satisfactoriamente.',
+          costo: `$${m.costo_final} MXN`,
+          refacciones: m.productos ? m.productos.map(p => `${p.cantidad}x ${p.nombre}`) : [],
+          cliente: m.cliente_nombre || 'Cliente San Jorge',
+          vehiculoMarca: m.vehiculo_marca || '',
+          vehiculoModelo: m.vehiculo_modelo || '',
+          placa: m.vehiculo_placa || 'S/N'
+        }));
+        setServiciosVehiculo(mapped);
+      })
+      .catch(console.error);
+  }, []);
 
   const handlePrint = (id) => {
     setPrintingServiceId(id);
@@ -52,11 +59,12 @@ export default function ReportesCliente() {
           </div>
           
           <div className="relative z-10 w-full mb-6 md:mb-0">
-            <h2 className="text-2xl font-bold mb-4">Toyota Corolla 2020</h2>
+            <h2 className="text-2xl font-bold mb-4">
+              {serviciosVehiculo.length > 0 ? `${serviciosVehiculo[0].vehiculoMarca} ${serviciosVehiculo[0].vehiculoModelo}` : 'Vehículo del cliente'}
+            </h2>
             <div className="space-y-1.5 text-blue-100 text-sm">
-              <p>Placa: <span className="text-white font-medium">ABC-123-XYZ</span></p>
-              <p>Motor: <span className="text-white font-medium">4 cilindros</span></p>
-              <p>Kilometraje actual: <span className="text-white font-medium">45,230 km</span></p>
+              <p>Placa: <span className="text-white font-medium">{serviciosVehiculo.length > 0 ? serviciosVehiculo[0].placa : '---'}</span></p>
+              <p>Kilometraje reciente: <span className="text-white font-medium">{serviciosVehiculo.length > 0 ? serviciosVehiculo[0].kilometraje : '---'}</span></p>
             </div>
           </div>
 
@@ -175,21 +183,21 @@ export default function ReportesCliente() {
               <div className="w-[45%] space-y-4">
                 <div className="flex border-b border-gray-400 pb-1">
                   <span className="w-24">CLIENTE:</span>
-                  <span className="font-normal font-serif italic text-base">Juan Pérez</span>
+                  <span className="font-normal font-serif italic text-base">{serviciosVehiculo.find(s => s.id === printingServiceId)?.cliente}</span>
                 </div>
                 <div className="flex border-b border-gray-400 pb-1">
                   <span className="w-24">VEHÍCULO:</span>
-                  <span className="font-normal font-serif italic text-base">2020 Toyota Corolla</span>
+                  <span className="font-normal font-serif italic text-base">{serviciosVehiculo.find(s => s.id === printingServiceId)?.vehiculoMarca} {serviciosVehiculo.find(s => s.id === printingServiceId)?.vehiculoModelo}</span>
                 </div>
               </div>
               <div className="w-[45%] space-y-4">
                 <div className="flex border-b border-gray-400 pb-1">
                   <span className="w-24">TELÉFONO:</span>
-                  <span className="font-normal font-serif italic text-base">55 1000 1000</span>
+                  <span className="font-normal font-serif italic text-base">Registrado en sistema</span>
                 </div>
                 <div className="flex border-b border-gray-400 pb-1">
-                  <span className="w-24">NIV:</span>
-                  <span className="font-normal font-serif italic text-base uppercase tracking-wider">ABC123XYZ00000</span>
+                  <span className="w-24">PLACA:</span>
+                  <span className="font-normal font-serif italic text-base uppercase tracking-wider">{serviciosVehiculo.find(s => s.id === printingServiceId)?.placa}</span>
                 </div>
               </div>
             </div>
@@ -269,8 +277,8 @@ export default function ReportesCliente() {
 
             {/* Date and KM */}
             <div className="mt-8 flex justify-end gap-6 text-sm font-bold border-b border-gray-400 pb-1 w-[40%] ml-auto pr-4">
-              <span>FECHA: {serviciosVehiculo.find(s => s.id === printingServiceId)?.fecha.split(' de ')[0]}/{serviciosVehiculo.find(s => s.id === printingServiceId)?.fecha.split(' de ')[1].substring(0,3).toUpperCase()}/{serviciosVehiculo.find(s => s.id === printingServiceId)?.fecha.split(' de ')[2]}</span>
-              <span>KM: {serviciosVehiculo.find(s => s.id === printingServiceId)?.kilometraje.split(' ')[0]}</span>
+              <span>FECHA: {serviciosVehiculo.find(s => s.id === printingServiceId)?.fecha}</span>
+              <span>KM: {serviciosVehiculo.find(s => s.id === printingServiceId)?.kilometraje.replace(' km', '')}</span>
             </div>
 
             {/* Red footer bar */}

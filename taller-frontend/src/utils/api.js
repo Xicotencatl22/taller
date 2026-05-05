@@ -29,6 +29,9 @@ export const updateCita = (id, data) => request(`/api/citas/${id}`, {
   method: 'PATCH',
   body: JSON.stringify(data),
 });
+export const deleteCita = (id) => request(`/api/citas/${id}`, {
+  method: 'DELETE',
+});
 
 // ─── Cotizaciones ─────────────────────────────────────────────────────────────
 export const fetchCotizaciones = () => request('/api/cotizaciones');
@@ -120,3 +123,8 @@ export const createCompra = (data) => request('/api/compras', {
 export const fetchMantenimientos = () => request('/api/mantenimientos');
 export const createMantenimiento = (data) => request('/api/mantenimientos', { method: 'POST', body: JSON.stringify(data) });
 export const updateMantenimientoEstado = (id, estado) => request(`/api/mantenimientos/${id}/estado`, { method: 'PUT', body: JSON.stringify({ estado }) });
+
+// --- Reportes ---
+export const fetchReporteVentas = () => request('/api/reportes/ventas');
+export const fetchReporteProductos = () => request('/api/reportes/productos');
+export const fetchReporteServicios = () => request('/api/reportes/servicios');

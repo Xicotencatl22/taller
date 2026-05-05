@@ -1,26 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import logo from '../assets/logg.png';
+import { fetchReporteVentas, fetchReporteProductos, fetchReporteServicios } from '../utils/api';
 
-// For the background watermark
-const carWatermark = "https://www.transparenttextures.com/patterns/stardust.png"; // Placeholder for an actual texture, since we can't load the real car easily without the asset. Wait, we can just use SVG or no background if we don't have the image.
+const carWatermark = "https://www.transparenttextures.com/patterns/stardust.png";
 
 export default function Reportes() {
   const [activeReportTab, setActiveReportTab] = useState('productos');
 
-  // Datos simulados para Reporte de Ventas
-  const dataVentas = [
-    { id: "V-001", cliente: "Carlos Méndez", servicio: "Cambio de aceite", fecha: "2024-01-10", total: 1250, metodo: "efectivo" },
-    { id: "V-002", cliente: "Ana López", servicio: "Alineación", fecha: "2024-01-11", total: 850, metodo: "tarjeta" },
-    { id: "V-003", cliente: "Juan Pérez", servicio: "Frenos", fecha: "2024-01-12", total: 3200, metodo: "transferencia" }
-  ];
+  const [dataVentas, setDataVentas] = useState([]);
+  const [prodStats, setProdStats] = useState({ valorInventario: 0, productosVendidosMes: 0, ingresosTotales: 0 });
+  const [rendimientoProductos, setRendimientoProductos] = useState([]);
+  const [servStats, setServStats] = useState({ serviciosRealizados: 0, ingresosPorServicios: 0, ticketPromedio: 0 });
+  const [distribucionServicios, setDistribucionServicios] = useState([]);
 
-  // Datos simulados para Rendimiento de Productos
-  const rendimientoProductos = [
-    { id: 1, nombre: "Aceite sintético", stock: 24, total: "$11,250", ventas: 45, progress: "w-[40%]" },
-    { id: 2, nombre: "Filtros", stock: 45, total: "$4560", ventas: 38, progress: "w-[30%]" },
-    { id: 3, nombre: "Bujías", stock: 18, total: "$8800", ventas: 22, progress: "w-[20%]" },
-    { id: 4, nombre: "Pastillas freno", stock: 8, total: "$9750", ventas: 15, progress: "w-[15%]" }
+  useEffect(() => {
+    fetchReporteVentas().then(setDataVentas).catch(console.error);
+    fetchReporteProductos().then(res => {
+      setProdStats({
+        valorInventario: res.valorInventario || 0,
+        productosVendidosMes: res.productosVendidosMes || 0,
+        ingresosTotales: res.ingresosTotales || 0
+      });
+      setRendimientoProductos(res.rendimiento || []);
+    }).catch(console.error);
+    fetchReporteServicios().then(res => {
+      setServStats({
+        serviciosRealizados: res.serviciosRealizados || 0,
+        ingresosPorServicios: res.ingresosPorServicios || 0,
+        ticketPromedio: res.ticketPromedio || 0
+      });
+      setDistribucionServicios(res.distribucion || []);
+    }).catch(console.error);
+  }, []);
+
+  // Helpers for Services Pie Chart
+  const pieColors = ['#1A56DB', '#a855f7', '#f59e0b', '#10b981'];
+  const top4Services = distribucionServicios.slice(0, 4);
+  const totalTop4 = top4Services.reduce((acc, s) => acc + s.cantidad, 0) || 1;
+  let currentPiePercent = 0;
+  
+  const conicGradientString = top4Services.map((s, i) => {
+    const p = Math.round((s.cantidad / totalTop4) * 100);
+    const start = currentPiePercent;
+    currentPiePercent += p;
+    // ensure last slice closes exactly at 100%
+    const end = (i === top4Services.length - 1) ? 100 : currentPiePercent;
+    return `${pieColors[i]} ${start}% ${end}%`;
+  }).join(', ');
+
+  const pieLabelsPos = [
+    { class: "top-10 right-4", colorClass: "text-[#1A56DB]" },
+    { class: "bottom-10 -right-2", colorClass: "text-[#a855f7]" },
+    { class: "bottom-0 left-12", colorClass: "text-[#f59e0b]" },
+    { class: "top-1/2 -left-8 -translate-y-1/2", colorClass: "text-[#10b981]" }
   ];
 
   return (
@@ -79,12 +112,10 @@ export default function Reportes() {
 
         {/* --- CONTENIDO DE LAS PESTAÑAS --- */}
 
-        {/* PESTAÑA PRODUCTOS (Basada en Screenshot) */}
+        {/* PESTAÑA PRODUCTOS */}
         {activeReportTab === 'productos' && (
           <div className="space-y-6 print:hidden">
-            {/* Top Stat Cards Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Valor Inventario */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-blue-600 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -92,11 +123,10 @@ export default function Reportes() {
                   </svg>
                   Valor Inventario
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">$5,354</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">${prodStats.valorInventario.toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
                 <div className="text-sm text-gray-500 mt-1">Total en productos</div>
               </div>
 
-              {/* Productos Vendidos */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-green-500 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -104,11 +134,10 @@ export default function Reportes() {
                   </svg>
                   Productos Vendidos
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">120</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">{prodStats.productosVendidosMes}</div>
                 <div className="text-sm text-gray-500 mt-1">Unidades este mes</div>
               </div>
 
-              {/* Ingresos por Productos */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-purple-600 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -116,12 +145,11 @@ export default function Reportes() {
                   </svg>
                   Ingresos por Productos
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">$34,360</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">${prodStats.ingresosTotales.toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
                 <div className="text-sm text-green-500 mt-1 font-medium">Total generado</div>
               </div>
             </div>
 
-            {/* Rendimiento de Productos List */}
             <div className="bg-white rounded-xl border border-gray-100 p-8 shadow-sm">
               <h3 className="text-lg font-bold text-gray-900 mb-8">Rendimiento de Productos</h3>
               
@@ -145,9 +173,8 @@ export default function Reportes() {
                         <div className="text-xs text-gray-500 mt-0.5">{prod.ventas} ventas</div>
                       </div>
                     </div>
-                    {/* Progress Bar Container */}
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className={`h-full bg-[#1a56db] rounded-full ${prod.progress}`}></div>
+                      <div className="h-full bg-[#1a56db] rounded-full" style={{ width: (prod.progress || '').replace('w-[', '').replace(']', '') }}></div>
                     </div>
                   </div>
                 ))}
@@ -156,7 +183,7 @@ export default function Reportes() {
           </div>
         )}
 
-        {/* PESTAÑA VENTAS (Adaptado de ReporteDeVentas.jsx) */}
+        {/* PESTAÑA VENTAS */}
         {activeReportTab === 'ventas' && (
           <div className="space-y-6 print:hidden">
             <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -184,7 +211,7 @@ export default function Reportes() {
             <div className="flex gap-6">
               <div className="flex-1 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Total Ventas</h3>
-                <h2 className="text-3xl font-bold text-gray-900">${dataVentas.reduce((acc, v) => acc + v.total, 0)}</h2>
+                <h2 className="text-3xl font-bold text-gray-900">${dataVentas.reduce((acc, v) => acc + v.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</h2>
               </div>
               <div className="flex-1 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Número Ventas</h3>
@@ -200,7 +227,7 @@ export default function Reportes() {
                     <tr className="border-b border-gray-200">
                       <th className="pb-3 text-sm font-semibold text-gray-500 px-2">ID</th>
                       <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Cliente</th>
-                      <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Servicio</th>
+                      <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Servicio / Producto</th>
                       <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Fecha</th>
                       <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Total</th>
                       <th className="pb-3 text-sm font-semibold text-gray-500 px-2">Método</th>
@@ -213,7 +240,7 @@ export default function Reportes() {
                         <td className="py-4 px-2 text-sm text-gray-600">{v.cliente}</td>
                         <td className="py-4 px-2 text-sm text-gray-600">{v.servicio}</td>
                         <td className="py-4 px-2 text-sm text-gray-600">{v.fecha}</td>
-                        <td className="py-4 px-2 text-sm font-medium text-gray-900">${v.total}</td>
+                        <td className="py-4 px-2 text-sm font-medium text-gray-900">${v.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                         <td className="py-4 px-2">
                           <span
                             className={`px-3 py-1 text-white font-semibold rounded-full text-xs uppercase tracking-wide flex w-max ${
@@ -229,6 +256,11 @@ export default function Reportes() {
                         </td>
                       </tr>
                     ))}
+                    {dataVentas.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="py-8 text-center text-gray-500 text-sm">No hay ventas registradas</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -236,13 +268,11 @@ export default function Reportes() {
           </div>
         )}
 
-        {/* PESTAÑA SERVICIOS (Basada en Screenshot) */}
+        {/* PESTAÑA SERVICIOS */}
         {activeReportTab === 'servicios' && (
           <div className="space-y-6 print:hidden">
             
-            {/* Top Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Servicios Realizados */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-blue-600 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -250,11 +280,10 @@ export default function Reportes() {
                   </svg>
                   Servicios Realizados
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">123</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">{servStats.serviciosRealizados}</div>
                 <div className="text-sm text-gray-500 mt-1">Total histórico</div>
               </div>
 
-              {/* Ingresos por Servicios */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-green-500 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -262,11 +291,10 @@ export default function Reportes() {
                   </svg>
                   Ingresos por Servicios
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">$188,270</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">${servStats.ingresosPorServicios.toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
                 <div className="text-sm text-green-500 mt-1 font-medium">Total generado</div>
               </div>
 
-              {/* Promedio por Servicio */}
               <div className="bg-white rounded-xl border border-gray-100 p-6 flex flex-col justify-center shadow-sm">
                 <div className="flex items-center gap-2 text-purple-600 mb-4 font-semibold text-[11px] uppercase tracking-wider">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
@@ -274,84 +302,58 @@ export default function Reportes() {
                   </svg>
                   Promedio por Servicio
                 </div>
-                <div className="text-[2rem] font-bold text-gray-900 leading-tight">$1,531</div>
+                <div className="text-[2rem] font-bold text-gray-900 leading-tight">${servStats.ticketPromedio.toLocaleString('en-US', {minimumFractionDigits: 0})}</div>
                 <div className="text-sm text-gray-500 mt-1">Ticket promedio</div>
               </div>
             </div>
 
-            {/* Graphics Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Distribución de Servicios (Pie Chart) */}
               <div className="bg-white rounded-xl border border-gray-100 p-8 shadow-sm flex flex-col items-center">
                 <h3 className="text-lg font-bold text-gray-900 w-full mb-8">Distribución de Servicios</h3>
                 <div className="relative w-full max-w-sm aspect-square flex items-center justify-center">
                   
-                  {/* The actual pie chart */}
                   <div 
                     className="w-56 h-56 rounded-full"
                     style={{
-                      background: 'conic-gradient(#1A56DB 0% 26%, #a855f7 26% 41%, #f59e0b 41% 64%, #10b981 64% 100%)'
+                      background: top4Services.length > 0 
+                        ? `conic-gradient(${conicGradientString})` 
+                        : 'conic-gradient(#e5e7eb 0% 100%)'
                     }}
                   ></div>
                   
-                  {/* Inner white circle for donut effect, optional but good. Let's make it a pie, so leave as is */}
                   <div className="absolute w-[3px] h-full bg-white rotate-[-4deg]"></div>
                   <div className="absolute w-[3px] h-full bg-white rotate-[80deg]"></div>
                   
-                  {/* Labels floating around */}
-                  <div className="absolute top-10 right-4 text-sm font-semibold text-[#1A56DB]">Afinación básica 26%</div>
-                  <div className="absolute bottom-10 -right-2 text-sm font-semibold text-[#a855f7]">Afinación integral 15%</div>
-                  <div className="absolute bottom-0 left-12 text-sm font-semibold text-[#f59e0b]">Frenos 23%</div>
-                  <div className="absolute top-1/2 -left-8 -translate-y-1/2 text-sm font-semibold text-[#10b981] whitespace-nowrap">Cambio de aceite 37%</div>
+                  {top4Services.map((s, i) => (
+                    <div key={i} className={`absolute text-sm font-semibold whitespace-nowrap ${pieLabelsPos[i]?.class || ''} ${pieLabelsPos[i]?.colorClass || ''}`}>
+                      {s.nombre} {Math.round((s.cantidad / totalTop4) * 100)}%
+                    </div>
+                  ))}
+                  {top4Services.length === 0 && (
+                    <div className="absolute text-sm font-semibold text-gray-500">Sin datos</div>
+                  )}
                 </div>
               </div>
 
-              {/* Servicios más solicitados (Progress Bars) */}
               <div className="bg-white rounded-xl border border-gray-100 p-8 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-8">Servicios más solicitados</h3>
                 
                 <div className="space-y-6">
-                  {/* Bar 1 */}
-                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                      <span>Afinación básica</span>
-                      <span className="text-gray-500">32 servicios</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-[#1A56DB] h-full rounded-full" style={{width: '60%'}}></div>
-                    </div>
-                  </div>
-                  {/* Bar 2 */}
-                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                      <span>Cambio de aceite</span>
-                      <span className="text-gray-500">45 servicios</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-[#10b981] h-full rounded-full" style={{width: '85%'}}></div>
-                    </div>
-                  </div>
-                  {/* Bar 3 */}
-                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                      <span>Frenos</span>
-                      <span className="text-gray-500">28 servicios</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-[#f59e0b] h-full rounded-full" style={{width: '50%'}}></div>
-                    </div>
-                  </div>
-                  {/* Bar 4 */}
-                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                      <span>Afinación integral</span>
-                      <span className="text-gray-500">18 servicios</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                      <div className="bg-[#a855f7] h-full rounded-full" style={{width: '30%'}}></div>
-                    </div>
-                  </div>
+                  {distribucionServicios.slice(0, 4).map((s, i) => {
+                     const percent = Math.round((s.cantidad / (distribucionServicios[0]?.cantidad || 1)) * 100);
+                     return (
+                        <div key={i}>
+                          <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                            <span>{s.nombre}</span>
+                            <span className="text-gray-500">{s.cantidad} servicios</span>
+                          </div>
+                          <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{width: `${percent}%`, backgroundColor: pieColors[i % pieColors.length]}}></div>
+                          </div>
+                        </div>
+                     )
+                  })}
+                  {distribucionServicios.length === 0 && <p className="text-gray-500 text-sm italic">Sin datos registrados</p>}
                 </div>
 
               </div>
@@ -428,12 +430,12 @@ export default function Reportes() {
           <div className="mt-8">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-black tracking-tight mb-1">REPORTE DE VENTAS</h2>
-              <p className="text-gray-700 font-medium">Historial de Ventas - Detalle Completo (Enero 2024)</p>
+              <p className="text-gray-700 font-medium">Historial de Ventas - Detalle Completo</p>
               <p className="text-gray-600 text-sm mt-1">Fecha generación: {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
             </div>
 
             <div className="bg-gray-100 rounded-lg p-4 mb-6 relative z-10">
-              <p className="font-bold text-lg">Total de Ventas (Enero): <span className="font-normal text-gray-800">${dataVentas.reduce((acc, v) => acc + v.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</span></p>
+              <p className="font-bold text-lg">Total de Ventas: <span className="font-normal text-gray-800">${dataVentas.reduce((acc, v) => acc + v.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</span></p>
               <p className="font-bold text-lg">Número de Ventas: <span className="font-normal text-gray-800">{dataVentas.length}</span></p>
             </div>
 
@@ -442,7 +444,7 @@ export default function Reportes() {
                 <tr className="bg-gray-100 border-b border-gray-300">
                   <th className="p-3 border border-gray-300 font-bold uppercase text-sm">ID VENTA</th>
                   <th className="p-3 border border-gray-300 font-bold uppercase text-sm">CLIENTE</th>
-                  <th className="p-3 border border-gray-300 font-bold uppercase text-sm">SERVICIO</th>
+                  <th className="p-3 border border-gray-300 font-bold uppercase text-sm">SERVICIO/PRODUCTO</th>
                   <th className="p-3 border border-gray-300 font-bold uppercase text-sm">FECHA</th>
                   <th className="p-3 border border-gray-300 font-bold uppercase text-sm">TOTAL</th>
                   <th className="p-3 border border-gray-300 font-bold uppercase text-sm">MÉTODO DE PAGO</th>
@@ -533,21 +535,21 @@ export default function Reportes() {
           <div className="mt-8 relative">
             <div className="text-center mb-8 relative z-10">
               <h2 className="text-3xl font-black tracking-tight mb-1">REPORTE DE SERVICIOS</h2>
-              <p className="text-gray-700 font-medium">Análisis de Desempeño y Métrica de Servicios (Enero 2024)</p>
+              <p className="text-gray-700 font-medium">Análisis de Desempeño y Métrica de Servicios</p>
             </div>
 
             <div className="grid grid-cols-3 gap-6 mb-8 relative z-10 text-center">
               <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
                  <p className="text-gray-500 text-sm font-bold uppercase mb-2">Servicios Realizados</p>
-                 <p className="text-4xl font-black text-blue-600">123</p>
+                 <p className="text-4xl font-black text-blue-600">{servStats.serviciosRealizados}</p>
               </div>
               <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
                  <p className="text-gray-500 text-sm font-bold uppercase mb-2">Ingresos por Servicios</p>
-                 <p className="text-4xl font-black text-[#10b981]">$188,270</p>
+                 <p className="text-4xl font-black text-[#10b981]">${servStats.ingresosPorServicios.toLocaleString('en-US', {minimumFractionDigits: 0})}</p>
               </div>
               <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
                  <p className="text-gray-500 text-sm font-bold uppercase mb-2">Ticket Promedio</p>
-                 <p className="text-4xl font-black text-[#a855f7]">$1,531</p>
+                 <p className="text-4xl font-black text-[#a855f7]">${servStats.ticketPromedio.toLocaleString('en-US', {minimumFractionDigits: 0})}</p>
               </div>
             </div>
 
@@ -555,20 +557,21 @@ export default function Reportes() {
                <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
                   <h3 className="font-bold text-center border-b pb-2 mb-4">DISTRIBUCIÓN DE SERVICIOS</h3>
                   <ul className="space-y-3 font-semibold text-gray-800">
-                    <li className="flex justify-between items-center"><span className="text-[#1A56DB]">Afinación básica</span> <span>26%</span></li>
-                    <li className="flex justify-between items-center"><span className="text-[#a855f7]">Afinación integral</span> <span>15%</span></li>
-                    <li className="flex justify-between items-center"><span className="text-[#f59e0b]">Frenos</span> <span>23%</span></li>
-                    <li className="flex justify-between items-center"><span className="text-[#10b981]">Cambio de aceite</span> <span>37%</span></li>
+                    {top4Services.map((s, i) => (
+                      <li key={i} className="flex justify-between items-center">
+                        <span style={{color: pieColors[i]}}>{s.nombre}</span> 
+                        <span>{Math.round((s.cantidad / totalTop4) * 100)}%</span>
+                      </li>
+                    ))}
                   </ul>
                </div>
                <div className="bg-white border-2 border-gray-200 rounded-lg p-6">
                   <h3 className="font-bold text-center border-b pb-2 mb-4">SERVICIOS MÁS SOLICITADOS</h3>
                   <table className="w-full text-sm">
                     <tbody>
-                      <tr className="border-b"><td className="py-2.5 font-medium">Cambio de aceite</td><td className="text-right font-black text-[#10b981]">45 svcs</td></tr>
-                      <tr className="border-b"><td className="py-2.5 font-medium">Afinación básica</td><td className="text-right font-black text-[#1A56DB]">32 svcs</td></tr>
-                      <tr className="border-b"><td className="py-2.5 font-medium">Frenos</td><td className="text-right font-black text-[#f59e0b]">28 svcs</td></tr>
-                      <tr><td className="py-2.5 font-medium">Afinación integral</td><td className="text-right font-black text-[#a855f7]">18 svcs</td></tr>
+                      {distribucionServicios.slice(0, 4).map((s, i) => (
+                        <tr key={i} className="border-b"><td className="py-2.5 font-medium">{s.nombre}</td><td className="text-right font-black" style={{color: pieColors[i]}}>{s.cantidad} svcs</td></tr>
+                      ))}
                     </tbody>
                   </table>
                </div>

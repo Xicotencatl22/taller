@@ -1,94 +1,137 @@
-/**
- * @file reportes.js
- * @description Rutas para la generación de reportes del taller.
- *
- * Monta el enrutador bajo `/api/reportes` (definido en server.js).
- *
- * > **NOTA:** Este archivo aún utiliza sintaxis de MySQL (`?` como placeholder y `db.query` con callback).
- * > Debe migrarse a la sintaxis de PostgreSQL (`$1`, `$2`, etc. con `pool.query` async/await)
- * > para ser compatible con el resto del backend.
- *
- * | Método | Ruta                  | Descripción                                         |
- * |--------|-----------------------|-----------------------------------------------------|
- * | GET    | /api/reportes/ventas  | Lista ventas con filtros opcionales de fecha/cliente|
- *
- * @module routes/reportes
- */
-
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const pool = require('../db');
 
 /**
  * GET /api/reportes/ventas
- *
- * Obtiene un listado de ventas con sus totales, con filtros opcionales por rango de fechas
- * y por nombre de cliente.
- *
- * @name GET /ventas
- * @function
- * @param {import('express').Request}  req             - Objeto de solicitud HTTP.
- * @param {Object}                     req.query       - Query params opcionales.
- * @param {string}                     [req.query.inicio] - Fecha de inicio del filtro (YYYY-MM-DD).
- * @param {string}                     [req.query.fin]    - Fecha de fin del filtro (YYYY-MM-DD).
- * @param {string}                     [req.query.cliente] - Nombre del cliente a filtrar ("Todos" para sin filtro).
- * @param {import('express').Response} res             - Objeto de respuesta HTTP.
- * @returns {void} Responde con un objeto JSON:
- * ```json
- * {
- *   "total": 5000,
- *   "cantidad": 3,
- *   "data": [{ "id": 1, "cliente": "Juan", "servicio": "...", "fecha": "...", "total": 1500, "metodo": "..." }]
- * }
- * ```
- *
- * @example
- * // GET /api/reportes/ventas?inicio=2026-01-01&fin=2026-05-01&cliente=Juan
  */
-router.get('/ventas', (req, res) => {
-  const { inicio, fin, cliente } = req.query;
+router.get('/ventas', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        v.idVenta as id,
+        u.nombre AS cliente,
+        p.nombre AS servicio,
+        v.fecha,
+        v.total,
+        v.metodo_pago
+      FROM Venta v
+      LEFT JOIN Usuarios u ON u.idUsuarios = v.idUsuarios
+      LEFT JOIN Productos p ON p.idProductos = v.idProductos
+      ORDER BY v.fecha DESC
+    `);
 
-  let query = `
-    SELECT 
-      v.id,
-      c.nombre AS cliente,
-      v.servicio,
-      v.fecha,
-      v.total,
-      v.metodo
-    FROM ventas v
-    JOIN clientes c ON v.cliente_id = c.id
-    WHERE 1=1
-  `;
+    // Map metodo_pago to strings
+    const mapped = rows.map(r => {
+      let metodo = 'efectivo';
+      if (r.metodo_pago === 2) metodo = 'tarjeta';
+      if (r.metodo_pago === 3) metodo = 'transferencia';
+      return {
+        id: `V-${r.id.toString().padStart(3, '0')}`,
+        cliente: r.cliente || 'Cliente General',
+        servicio: r.servicio || 'Venta',
+        fecha: new Date(r.fecha).toLocaleDateString('es-ES'),
+        total: Number(r.total) || 0,
+        metodo
+      };
+    });
 
-  let params = [];
-
-  // Filtro por rango de fechas
-  if (inicio && fin) {
-    query += ' AND v.fecha BETWEEN ? AND ?';
-    params.push(inicio, fin);
+    res.json(mapped);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener reporte de ventas' });
   }
+});
 
-  // Filtro por nombre de cliente
-  if (cliente && cliente !== 'Todos') {
-    query += ' AND c.nombre = ?';
-    params.push(cliente);
-  }
+/**
+ * GET /api/reportes/productos
+ */
+router.get('/productos', async (req, res) => {
+  try {
+    // Top stats
+    const valorRes = await pool.query(`SELECT COALESCE(SUM(stock_actual * precio_venta), 0) as total FROM Productos`);
+    const vendidosRes = await pool.query(`
+      SELECT COUNT(*) as vendidos 
+      FROM Venta 
+      WHERE EXTRACT(MONTH FROM fecha) = EXTRACT(MONTH FROM CURRENT_DATE) 
+        AND EXTRACT(YEAR FROM fecha) = EXTRACT(YEAR FROM CURRENT_DATE)
+    `);
+    const ingresosRes = await pool.query(`SELECT COALESCE(SUM(total), 0) as ingresos FROM Venta`);
 
-  db.query(query, params, (err, result) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Error en la consulta' });
-    }
+    // Rendimiento
+    const rendRes = await pool.query(`
+      SELECT 
+        p.idProductos as id, 
+        p.nombre, 
+        p.stock_actual as stock,
+        COALESCE(SUM(v.total), 0) as total_ingresos,
+        COUNT(v.idVenta) as ventas
+      FROM Productos p
+      LEFT JOIN Venta v ON v.idProductos = p.idProductos
+      GROUP BY p.idProductos, p.nombre, p.stock_actual
+      ORDER BY ventas DESC
+    `);
 
-    const totalVentas = result.reduce((acc, v) => acc + Number(v.total), 0);
+    const maxVentas = Math.max(...rendRes.rows.map(r => Number(r.ventas)), 1);
+
+    const rendimiento = rendRes.rows.map(r => ({
+      id: r.id,
+      nombre: r.nombre,
+      stock: r.stock,
+      total: `$${Number(r.total_ingresos).toLocaleString('en-US', {minimumFractionDigits:0})}`,
+      ventas: Number(r.ventas),
+      progress: `w-[${Math.round((Number(r.ventas) / maxVentas) * 100)}%]` // Tailored inline width isn't always supported by Tailwind JIT unless whitelisted, so we might need inline style, but let's pass a percentage number
+    }));
 
     res.json({
-      total: totalVentas,
-      cantidad: result.length,
-      data: result
+      valorInventario: Number(valorRes.rows[0].total),
+      productosVendidosMes: Number(vendidosRes.rows[0].vendidos),
+      ingresosTotales: Number(ingresosRes.rows[0].ingresos),
+      rendimiento
     });
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener reporte de productos' });
+  }
+});
+
+/**
+ * GET /api/reportes/servicios
+ */
+router.get('/servicios', async (req, res) => {
+  try {
+    // Top stats
+    const countRes = await pool.query(`SELECT COUNT(*) as cantidad FROM DetalleMantenimientoServicios`);
+    const ingresosRes = await pool.query(`SELECT COALESCE(SUM(precio), 0) as ingresos FROM DetalleMantenimientoServicios`);
+    
+    const realizados = Number(countRes.rows[0].cantidad);
+    const ingresos = Number(ingresosRes.rows[0].ingresos);
+    const ticketPromedio = realizados > 0 ? ingresos / realizados : 0;
+
+    // Distribución
+    const distRes = await pool.query(`
+      SELECT 
+        s.nombre, 
+        COUNT(d.idDetalle) as cantidad
+      FROM Servicios s
+      LEFT JOIN DetalleMantenimientoServicios d ON s.idServicios = d.idServicios
+      GROUP BY s.idServicios, s.nombre
+      ORDER BY cantidad DESC
+    `);
+
+    res.json({
+      serviciosRealizados: realizados,
+      ingresosPorServicios: ingresos,
+      ticketPromedio: ticketPromedio,
+      distribucion: distRes.rows.map(r => ({
+        nombre: r.nombre,
+        cantidad: Number(r.cantidad)
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener reporte de servicios' });
+  }
 });
 
 module.exports = router;

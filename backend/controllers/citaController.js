@@ -196,8 +196,30 @@ const updateCita = async (req, res) => {
   }
 };
 
+/**
+ * Elimina una cita de la base de datos por su ID.
+ *
+ * @async
+ * @function deleteCita
+ * @param {import('express').Request}  req          - Objeto de solicitud HTTP.
+ * @param {Object}                     req.params   - Parámetros de ruta.
+ * @param {string}                     req.params.id - ID de la cita a eliminar.
+ * @param {import('express').Response} res          - Objeto de respuesta HTTP.
+ * @returns {Promise<void>} Responde con un mensaje de confirmación (200) o error (500).
+ */
+const deleteCita = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM Cita WHERE idCita = $1', [id]);
+    res.json({ message: `Cita ${id} eliminada` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   getAllCitas,
   createCita,
   updateCita,
+  deleteCita,
 };

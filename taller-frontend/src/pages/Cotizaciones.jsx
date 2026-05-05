@@ -24,20 +24,47 @@ export default function Cotizaciones() {
     setLoadingQuotes(true);
     try {
       const data = await fetchCotizaciones();
-      const mapped = data.map((item) => ({
-        ...item,
-        id: item.id,
-        cliente: item.cliente || `Cliente ${item.id}`,
-        email: item.email || 'No disponible',
-        servicio: item.servicio || 'Servicio no asignado',
-        vehiculo: item.vehiculo || 'Vehículo no asignado',
-        fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
-        validaHasta: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
-        manoObra: item.totalEstimado || 0,
-        refacciones: 0,
-        total: item.totalEstimado || 0,
-        avatar: item.cliente ? item.cliente.charAt(0).toUpperCase() : 'C',
-      }));
+      const mapped = data.map((item) => {
+        let extrCliente = item.cliente;
+        let extrVehiculo = item.vehiculo;
+        let extrServicio = item.servicio;
+        let extrEmail = item.email;
+
+        if (item.detalles && item.detalles.includes('Cliente:')) {
+           const parts = item.detalles.split(' | ');
+           parts.forEach(p => {
+             if (p.startsWith('Cliente:')) {
+               const cInfo = p.replace('Cliente:', '').split('-');
+               extrCliente = cInfo[0].trim();
+               if (cInfo[1]) extrEmail = cInfo[1].trim();
+             }
+             if (p.startsWith('Vehículo:')) {
+               extrVehiculo = p.replace('Vehículo:', '').trim();
+             }
+             if (p.startsWith('Servicios:')) {
+               extrServicio = p.replace('Servicios:', '').trim();
+             }
+           });
+        }
+
+        const finalCliente = extrCliente && extrCliente.trim() !== '' ? extrCliente : `Cliente sin registro`;
+
+        return {
+          ...item,
+          id: item.id,
+          cliente: finalCliente,
+          email: extrEmail || 'No disponible',
+          servicio: extrServicio || 'Servicio no asignado',
+          vehiculo: extrVehiculo || 'Vehículo no asignado',
+          estado: item.estado || 'Pendiente',
+          fecha: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+          validaHasta: item.fecha ? new Date(item.fecha).toLocaleDateString('es-ES') : 'Sin fecha',
+          manoObra: item.totalEstimado || 0,
+          refacciones: 0,
+          total: item.totalEstimado || 0,
+          avatar: finalCliente.charAt(0).toUpperCase(),
+        };
+      });
       setCotizaciones(mapped);
       const activas = mapped.length;
       const aceptadas = mapped.filter((item) => item.estado === 'Aceptada').length;
@@ -73,6 +100,9 @@ export default function Cotizaciones() {
 
   const handleCreateQuote = async () => {
     const totalEstimado = Number(newQuoteForm.manoObra || 0) + Number(newQuoteForm.refacciones || 0);
+    const sNombres = serviciosList.filter(s => newQuoteForm.servicios.includes(s.id)).map(s => s.nombre).join(', ') || 'Cotización General';
+    const detallesStr = `Cliente: ${newQuoteForm.cliente} - ${newQuoteForm.email} | Vehículo: ${newQuoteForm.vehiculo} | Servicios: ${sNombres}`;
+
     try {
       await createCotizacion({
         idUsuarios: null,
@@ -81,6 +111,8 @@ export default function Cotizaciones() {
         idProductos: null,
         total_estimado: totalEstimado,
         fecha: newQuoteForm.validaHasta || new Date().toISOString().slice(0, 10),
+        detalles: detallesStr,
+        estado: 'Pendiente'
       });
       setIsModalOpen(false);
       setNewQuoteForm({
