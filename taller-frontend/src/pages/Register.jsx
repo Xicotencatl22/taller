@@ -31,6 +31,30 @@ function Register() {
     return hasNumbers && isLongEnough;
   };
 
+  const checkExistingUser = async (email, name) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:4000'}/api/users`);
+      if (response.ok) {
+        const users = await response.json();
+        const existingEmail = users.find(user => user.email.toLowerCase() === email.toLowerCase());
+        const existingName = users.find(user => user.name.toLowerCase() === name.toLowerCase());
+
+        if (existingEmail) {
+          setEmailError("Este correo electrónico ya está registrado");
+          return false;
+        }
+        if (existingName) {
+          setNameError("Este nombre ya está registrado");
+          return false;
+        }
+      }
+    } catch (error) {
+      // If we can't check, continue with registration (backend will handle it)
+      console.log("No se pudo verificar usuarios existentes:", error);
+    }
+    return true;
+  };
+
   const validateNameField = () => {
     const message = name.trim() ? "" : "El nombre completo es obligatorio.";
     setNameError(message);
@@ -44,7 +68,8 @@ function Register() {
   };
 
   const validatePhoneField = () => {
-    const message = phone && phone.length > 20 ? "El teléfono es demasiado largo." : "";
+    const phoneRegex = /^\d{10}$/;
+    const message = phone ? (phoneRegex.test(phone) ? "" : "El teléfono debe contener exactamente 10 dígitos numéricos") : "";
     setPhoneError(message);
     return !message;
   };
@@ -59,6 +84,19 @@ function Register() {
     const message = confirmPassword ? (password === confirmPassword ? "" : "Las contraseñas no coinciden") : "Debes confirmar tu contraseña.";
     setConfirmPasswordError(message);
     return !message;
+  };
+
+  const isFormComplete = () => {
+    return name.trim() &&
+           email.trim() &&
+           phone.trim() &&
+           password.trim() &&
+           confirmPassword.trim() &&
+           !nameError &&
+           !emailError &&
+           !phoneError &&
+           !passwordError &&
+           !confirmPasswordError;
   };
 
   const handleSubmit = async (e) => {
@@ -76,7 +114,12 @@ function Register() {
       return;
     }
 
-    setLoading(true);
+    // Check for existing users
+    const usersAvailable = await checkExistingUser(email, name);
+    if (!usersAvailable) {
+      setError("Corrige los errores marcados antes de continuar.");
+      return;
+    }
 
     setLoading(true);
 
@@ -85,8 +128,7 @@ function Register() {
       navigate("/login");
     } else {
       setError(result.error);
-      setPassword("");
-      setConfirmPassword("");
+      // Don't clear passwords on error
     }
     setLoading(false);
   };
@@ -129,7 +171,10 @@ function Register() {
                   setName(e.target.value);
                   if (nameError) setNameError("");
                 }}
-                onBlur={validateNameField}
+                onBlur={() => {
+                  validateNameField();
+                  checkExistingUser(email, e.target.value);
+                }}
                 placeholder="Juan Pérez García"
                 className={`w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${nameError ? 'border-red-500 border' : 'border border-gray-300'}`}
               />
@@ -148,7 +193,10 @@ function Register() {
                   setEmail(e.target.value);
                   if (emailError) setEmailError("");
                 }}
-                onBlur={validateEmailField}
+                onBlur={() => {
+                  validateEmailField();
+                  checkExistingUser(e.target.value, name);
+                }}
                 placeholder="ejemplo@correo.com"
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${emailError ? 'border-red-500' : 'border-gray-300'}`}
               />
@@ -162,11 +210,14 @@ function Register() {
                 type="tel"
                 value={phone}
                 onChange={(e) => {
-                  setPhone(e.target.value);
+                  // Only allow numbers and limit to 10 digits
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setPhone(value);
                   if (phoneError) setPhoneError("");
                 }}
                 onBlur={validatePhoneField}
-                placeholder="+56 9 1234 5678"
+                placeholder="8841397918"
+                maxLength={10}
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${phoneError ? 'border-red-500' : 'border-gray-300'}`}
               />
               {phoneError && <p className="mt-2 text-sm text-red-600">{phoneError}</p>}
@@ -241,8 +292,8 @@ function Register() {
             {/* Submit button */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition duration-200 disabled:bg-gray-400"
+              disabled={loading || !isFormComplete()}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition duration-200"
             >
               {loading ? "Creando cuenta..." : "Crear Cuenta"}
             </button>

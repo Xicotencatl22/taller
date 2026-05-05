@@ -11,12 +11,17 @@ function AdminDashboard() {
   const { roles, users, saveRole, deleteRole, saveUser, deleteUser, fetchUsers } = useContext(AuthContext);
 
   const [tab, setTab] = useState(location.state?.tab || 'dashboard');
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
 
   useEffect(() => {
     if (location.state?.tab) {
       setTab(location.state.tab);
     }
   }, [location.state?.tab]);
+
+  const toggleSidebar = () => {
+    setIsSidebarVisible((prev) => !prev);
+  };
 
   const [stats, setStats] = useState({
     inventoryValue: 0,
@@ -44,6 +49,7 @@ function AdminDashboard() {
   const [userError, setUserError] = useState('');
   const [userNameError, setUserNameError] = useState('');
   const [userEmailError, setUserEmailError] = useState('');
+  const [userPhoneError, setUserPhoneError] = useState('');
   const [userPasswordError, setUserPasswordError] = useState('');
 
   // Role modal and filters
@@ -83,6 +89,13 @@ function AdminDashboard() {
     return !message;
   };
 
+  const validateUserPhoneField = () => {
+    const phoneRegex = /^\d{10}$/;
+    const message = userPhone ? (phoneRegex.test(userPhone) ? '' : 'El teléfono debe contener exactamente 10 dígitos numéricos') : '';
+    setUserPhoneError(message);
+    return !message;
+  };
+
   const validateUserPasswordField = () => {
     const message = userPassword
       ? userPassword.length > 6 && /\d/.test(userPassword)
@@ -107,6 +120,17 @@ function AdminDashboard() {
     return !message;
   };
 
+  const isUserFormComplete = () => {
+    return userName.trim() &&
+           userEmail.trim() &&
+           userPassword.trim() &&
+           userRole &&
+           !userNameError &&
+           !userEmailError &&
+           !userPhoneError &&
+           !userPasswordError;
+  };
+
   const counts = useMemo(() => {
     const totalUsers = users.length;
     const adminCount = users.filter((u) => u.role === 'Administrador').length;
@@ -121,9 +145,28 @@ function AdminDashboard() {
 
     const isNameValid = validateUserNameField();
     const isEmailValid = validateUserEmailField();
+    const isPhoneValid = validateUserPhoneField();
     const isPasswordValid = validateUserPasswordField();
 
-    if (!isNameValid || !isEmailValid || !isPasswordValid || !userRole) {
+    if (!isNameValid || !isEmailValid || !isPhoneValid || !isPasswordValid || !userRole) {
+      setUserError('Corrige los errores de usuario antes de continuar.');
+      return;
+    }
+
+    const existingEmailUser = users.find(
+      (u) => u.email?.toLowerCase() === userEmail.trim().toLowerCase() && u.id !== editingUserId
+    );
+    if (existingEmailUser) {
+      setUserEmailError('Ya existe un usuario con ese correo.');
+      setUserError('Corrige los errores de usuario antes de continuar.');
+      return;
+    }
+
+    const existingNameUser = users.find(
+      (u) => u.name?.toLowerCase() === userName.trim().toLowerCase() && u.id !== editingUserId
+    );
+    if (existingNameUser) {
+      setUserNameError('Ya existe un usuario con ese nombre.');
       setUserError('Corrige los errores de usuario antes de continuar.');
       return;
     }
@@ -146,14 +189,9 @@ function AdminDashboard() {
       }
       setEditingUserId(null);
     } else {
-      if (users.some((u) => u.email === userEmail)) {
-        setUserError('Ya existe un usuario con ese correo.');
-        return;
-      }
       const result = await saveUser({ name: userName, email: userEmail, password: userPassword, role: userRole, phone: userPhone });
       if (!result.success) {
         setUserError(result.error || 'No se pudo crear usuario.');
-        return;
         return;
       }
     }
@@ -185,6 +223,7 @@ function AdminDashboard() {
     setUserError('');
     setUserNameError('');
     setUserEmailError('');
+    setUserPhoneError('');
     setUserPasswordError('');
     setUserModalOpen(true);
   };
@@ -297,8 +336,9 @@ function AdminDashboard() {
     <div className="flex h-screen bg-gray-50 text-left overflow-hidden">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
-        <div className="p-6 flex items-center gap-3">
+      {isSidebarVisible && (
+        <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
+          <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
             {/* Logo de carro (placeholder simple) */}
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
@@ -359,13 +399,14 @@ function AdminDashboard() {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50">
 
         {/* Top Navbar */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
-          <button className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
+          <button onClick={toggleSidebar} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
@@ -635,7 +676,20 @@ function AdminDashboard() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Teléfono (opcional)</label>
-                        <input type="tel" value={userPhone} onChange={(e) => setUserPhone(e.target.value)} placeholder="123-456-7890" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm" />
+                        <input
+                          type="tel"
+                          value={userPhone}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setUserPhone(value);
+                            if (userPhoneError) setUserPhoneError('');
+                          }}
+                          onBlur={validateUserPhoneField}
+                          placeholder="8841397918"
+                          maxLength={10}
+                          className={`w-full p-2.5 rounded-lg text-sm ${userPhoneError ? 'border-red-500 border' : 'border border-gray-300'}`}
+                        />
+                        {userPhoneError && <p className="mt-2 text-sm text-red-600">{userPhoneError}</p>}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">Contraseña *</label>
@@ -667,7 +721,13 @@ function AdminDashboard() {
                       {userError && <p className="text-red-600 text-sm bg-red-50 p-2 rounded">{userError}</p>}
                       <div className="flex gap-3 pt-4">
                         <button type="button" onClick={closeUserModal} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">Cancelar</button>
-                        <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{editingUserId ? 'Guardar cambios' : 'Registrar'}</button>
+                        <button
+                          type="submit"
+                          disabled={!isUserFormComplete()}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium ${isUserFormComplete() ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                        >
+                          {editingUserId ? 'Guardar cambios' : 'Registrar'}
+                        </button>
                       </div>
                     </form>
                   </div>
