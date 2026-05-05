@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminLayout({ children, activeTab, onTabClick }) {
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const navigate = useNavigate();
 
   const menu = [
@@ -31,9 +32,14 @@ export default function AdminLayout({ children, activeTab, onTabClick }) {
     }
   };
 
+  const toggleSidebar = () => {
+    setIsSidebarVisible((prev) => !prev);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 text-left overflow-hidden">
-      <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
+      {isSidebarVisible && (
+        <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
         <div className="p-6 flex items-center gap-3">
           <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
@@ -66,10 +72,11 @@ export default function AdminLayout({ children, activeTab, onTabClick }) {
            </button>
         </div>
       </aside>
+      )}
 
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50">
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 shadow-sm">
-          <button className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
+          <button onClick={toggleSidebar} className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>

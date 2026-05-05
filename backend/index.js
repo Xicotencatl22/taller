@@ -147,6 +147,8 @@ let userRoleIdColumn = 'idroles';
  * @returns {Promise<void>}
  */
 const initializeDatabase = async () => {
+  // Drop old Roles table if it has incorrect schema
+  await pool.query(`DROP TABLE IF EXISTS Roles CASCADE;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS Roles (
@@ -434,7 +436,7 @@ const initializeDatabase = async () => {
     if (storedPermissions.length === 0 && role.permisos.length > 0) {
       await pool.query(
         'UPDATE Roles SET permisos = $1 WHERE idRoles = $2',
-        [JSON.stringify(role.permisos), existingRole.idroles]
+        [JSON.stringify(role.permisos), existingRole.idRoles]
       );
     }
   }
@@ -543,7 +545,7 @@ app.post('/api/roles', async (req, res) => {
       'INSERT INTO Roles (nombre, descripcion, permisos) VALUES ($1, $2, $3) RETURNING idRoles',
       [name.trim(), description.trim(), JSON.stringify(permissions)]
     );
-    const { rows } = await pool.query('SELECT * FROM Roles WHERE idRoles = $1', [result.rows[0].idroles]);
+    const { rows } = await pool.query('SELECT * FROM Roles WHERE idRoles = $1', [result.rows[0].idRoles]);
     res.json(formatRoleRow(rows[0]));
   } catch (err) {
     console.error(err);

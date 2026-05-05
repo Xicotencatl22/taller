@@ -114,13 +114,13 @@ export default function AdminMantenimiento() {
 
   const agregarRefaccion = () => {
     if (!nuevaRefaccion.id || nuevaRefaccion.cantidad < 1) return;
-    const prod = productosDb.find(p => p.idProductos === Number(nuevaRefaccion.id));
+    const prod = productosDb.find(p => p.idproductos === Number(nuevaRefaccion.id));
     if (prod) {
-      const existe = refacciones.find(r => r.id === prod.idProductos);
+      const existe = refacciones.find(r => r.id === prod.idproductos);
       if (existe) {
-        setRefacciones(refacciones.map(r => r.id === prod.idProductos ? { ...r, cantidad: r.cantidad + nuevaRefaccion.cantidad } : r));
+        setRefacciones(refacciones.map(r => r.id === prod.idproductos ? { ...r, cantidad: r.cantidad + nuevaRefaccion.cantidad } : r));
       } else {
-        setRefacciones([...refacciones, { id: prod.idProductos, nombre: prod.nombre, precio_unitario: prod.precio_unitario, cantidad: nuevaRefaccion.cantidad }]);
+        setRefacciones([...refacciones, { id: prod.idproductos, nombre: prod.nombre, precio_unitario: prod.precio_unitario, cantidad: nuevaRefaccion.cantidad }]);
       }
       setNuevaRefaccion({ id: '', cantidad: 1 });
     }
@@ -424,7 +424,7 @@ export default function AdminMantenimiento() {
                       <select className="w-full px-4 py-2.5 border border-yellow-200 rounded-lg text-sm focus:ring-2 focus:ring-yellow-500 outline-none bg-white"
                         value={nuevaRefaccion.id} onChange={e => setNuevaRefaccion({ ...nuevaRefaccion, id: e.target.value })}>
                         <option value="">Seleccione una refacción del inventario</option>
-                        {productosDb.map(p => <option key={p.idProductos} value={p.idProductos}>{p.nombre} (${p.precio_unitario} - Stock: {p.stock_actual})</option>)}
+                        {productosDb.map(p => <option key={p.idproductos} value={p.idproductos}>{p.nombre} (${p.precio_unitario} - Stock: {p.stock_actual})</option>)}
                       </select>
                     </div>
                     <div className="w-full md:w-20">
