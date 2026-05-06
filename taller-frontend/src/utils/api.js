@@ -105,6 +105,30 @@ export const deleteProducto = (id) => request(`/api/productos/${id}`, {
   method: 'DELETE',
 });
 
+// ─── Compatibilidad por Modelo ────────────────────────────────────────────────
+export const fetchProductosCompatibles = (idModelos) =>
+  request(`/api/productos/compatibles?idModelos=${idModelos}`);
+
+export const fetchCompatibilidadProducto = (idProducto) =>
+  request(`/api/productos/${idProducto}/compatibilidad`);
+
+export const addCompatibilidad = (idProducto, data) =>
+  request(`/api/productos/${idProducto}/compatibilidad`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateCompatibilidad = (id, data) =>
+  request(`/api/productos/compatibilidad/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+
+export const deleteCompatibilidad = (id) =>
+  request(`/api/productos/compatibilidad/${id}`, {
+    method: 'DELETE',
+  });
+
 // ─── Usuarios ────────────────────────────────────────────────────────────────
 export const fetchUsers = () => request('/api/users');
 

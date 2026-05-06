@@ -8,9 +8,9 @@ export default function Productos() {
   const [nuevo, setNuevo] = useState({
     id: null,
     nombre: '',
+    marca: '',
     categoria: '',
     precio_venta: '',
-    precio_unitario: '',
     stock_minimo: '',
     stock_actual: 0,
     sku: '',
@@ -38,7 +38,7 @@ export default function Productos() {
   }, []);
 
   const resetForm = () => setNuevo({
-    id: null, nombre: '', categoria: '', precio_venta: '', precio_unitario: '',
+    id: null, nombre: '', marca: '', categoria: '', precio_venta: '',
     stock_minimo: '', stock_actual: 0, sku: '', ubicacion_almacen: '',
   });
 
@@ -47,9 +47,10 @@ export default function Productos() {
     try {
       const payload = {
         nombre: nuevo.nombre,
+        marca: nuevo.marca,
         categoria: nuevo.categoria,
         precio_venta: Number(nuevo.precio_venta) || 0,
-        precio_unitario: Number(nuevo.precio_unitario) || 0,
+        precio_unitario: Number(nuevo.precio_venta) || 0, // use venta as cost basis
         stock_minimo: Number(nuevo.stock_minimo) || 0,
         stock_actual: editando ? Number(nuevo.stock_actual) || 0 : 0,
         sku: nuevo.sku || '',
@@ -74,9 +75,9 @@ export default function Productos() {
     setNuevo({
       id: p.idproductos,
       nombre: p.nombre || '',
+      marca: p.marca || '',
       categoria: p.categoria || '',
       precio_venta: p.precio_venta || '',
-      precio_unitario: p.precio_unitario || '',
       stock_minimo: p.stock_minimo || '',
       stock_actual: p.stock_actual || 0,
       sku: p.sku || '',
@@ -216,6 +217,7 @@ export default function Productos() {
                     <div>
                       <h3 className="text-lg font-bold text-gray-900">{p.nombre}</h3>
                       <div className="flex items-center gap-3 mt-1">
+                        {p.marca && <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-semibold">{p.marca}</span>}
                         {p.categoria && <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-semibold">{p.categoria}</span>}
                         {p.sku && <span className="text-xs text-gray-500">SKU: {p.sku}</span>}
                       </div>
@@ -234,10 +236,6 @@ export default function Productos() {
                     <div>
                       <div className="text-[11px] text-gray-500 mb-1 font-medium">Precio venta</div>
                       <div className="text-sm text-blue-600 font-bold mt-1">${p.precio_venta || 0}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] text-gray-500 mb-1 font-medium">Precio unitario</div>
-                      <div className="text-sm text-gray-900 mt-1">${p.precio_unitario || 0}</div>
                     </div>
                     <div>
                       <div className="text-[11px] text-gray-500 mb-1 font-medium">Ubicación</div>
@@ -315,10 +313,17 @@ export default function Productos() {
                       value={nuevo.categoria} onChange={e => setNuevo({ ...nuevo, categoria: e.target.value })} placeholder="Lubricantes, Filtros..." />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">SKU <span className="text-red-500">*</span></label>
-                    <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
-                      value={nuevo.sku} onChange={e => setNuevo({ ...nuevo, sku: e.target.value })} placeholder="ACE-5W30-001" />
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Marca</label>
+                    <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={nuevo.marca} onChange={e => setNuevo({ ...nuevo, marca: e.target.value })} placeholder="Castrol, Bosch, NGK..." />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">SKU <span className="text-red-500">*</span></label>
+                  <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required
+                    value={nuevo.sku} onChange={e => setNuevo({ ...nuevo, sku: e.target.value })} placeholder="ACE-5W30-001" />
+                  <p className="text-xs text-gray-400 mt-1">El SKU debe ser único por producto.</p>
                 </div>
 
                 {editando && (
@@ -351,16 +356,10 @@ export default function Productos() {
                       value={nuevo.precio_venta} onChange={e => setNuevo({ ...nuevo, precio_venta: e.target.value })} placeholder="250.00" />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Precio unitario / costo (MXN)</label>
-                    <input type="number" step="0.01" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={nuevo.precio_unitario} onChange={e => setNuevo({ ...nuevo, precio_unitario: e.target.value })} placeholder="180.00" />
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Ubicación en almacén</label>
+                    <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      value={nuevo.ubicacion_almacen} onChange={e => setNuevo({ ...nuevo, ubicacion_almacen: e.target.value })} placeholder="Estante A-3" />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Ubicación en almacén</label>
-                  <input type="text" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    value={nuevo.ubicacion_almacen} onChange={e => setNuevo({ ...nuevo, ubicacion_almacen: e.target.value })} placeholder="Estante A-3" />
                 </div>
               </form>
 

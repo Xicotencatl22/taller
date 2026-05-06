@@ -23,7 +23,7 @@ export default function ReportesCliente() {
           tecnico: m.tecnico || 'Técnico asignado',
           observaciones: m.observaciones || 'Servicio realizado satisfactoriamente.',
           costo: `$${m.costo_final} MXN`,
-          refacciones: m.productos ? m.productos.map(p => `${p.cantidad}x ${p.nombre}`) : [],
+          refacciones: m.productos ? m.productos.map(p => ({ nombre: p.nombre, cantidad: p.cantidad, precio: p.precio })) : [],
           cliente: m.cliente_nombre || 'Cliente San Jorge',
           vehiculoMarca: m.vehiculo_marca || '',
           vehiculoModelo: m.vehiculo_modelo || '',
@@ -131,7 +131,7 @@ export default function ReportesCliente() {
                 <div className="flex flex-wrap gap-2">
                   {servicio.refacciones.map((ref, idx) => (
                     <span key={idx} className="bg-blue-50 text-[#1a56db] text-xs font-medium px-3 py-1.5 rounded-full border border-blue-100">
-                      {ref}
+                      {ref.cantidad}x {ref.nombre}
                     </span>
                   ))}
                 </div>
@@ -216,9 +216,9 @@ export default function ReportesCliente() {
                 {/* Dynamically get the current service's parts */}
                 {serviciosVehiculo.find(s => s.id === printingServiceId)?.refacciones.map((refaccion, idx) => (
                   <tr key={idx} className="border-b border-gray-400">
-                    <td className="border-r border-gray-400 p-2.5 text-center">1</td>
-                    <td className="border-r border-gray-400 p-2.5 uppercase">{refaccion}</td>
-                    <td className="border-r border-gray-400 p-2.5 text-center">$XX.XX</td>
+                    <td className="border-r border-gray-400 p-2.5 text-center">{refaccion.cantidad}</td>
+                    <td className="border-r border-gray-400 p-2.5 uppercase">{refaccion.nombre}</td>
+                    <td className="border-r border-gray-400 p-2.5 text-center">${Number(refaccion.precio || 0).toLocaleString()} MXN</td>
                     <td className="p-2.5 text-center flex items-center justify-between px-4">
                       <span>Completado</span>
                       <div className="w-4 h-4 border border-gray-500 flex items-center justify-center bg-gray-200 text-xs">✓</div>

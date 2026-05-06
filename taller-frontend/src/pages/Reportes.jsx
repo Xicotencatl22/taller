@@ -14,6 +14,24 @@ export default function Reportes() {
   const [servStats, setServStats] = useState({ serviciosRealizados: 0, ingresosPorServicios: 0, ticketPromedio: 0 });
   const [distribucionServicios, setDistribucionServicios] = useState([]);
 
+  // Filtros de fecha
+  const [fechaInicio, setFechaInicio] = useState('');
+  const [fechaFin, setFechaFin] = useState('');
+  const [filtroAplicado, setFiltroAplicado] = useState(false);
+
+  // Datos filtrados de ventas
+  const ventasFiltradas = (() => {
+    if (!filtroAplicado || (!fechaInicio && !fechaFin)) return dataVentas;
+    return dataVentas.filter(v => {
+      const fechaVenta = new Date(v.fecha);
+      const desde = fechaInicio ? new Date(fechaInicio + 'T00:00:00') : null;
+      const hasta = fechaFin   ? new Date(fechaFin   + 'T23:59:59') : null;
+      if (desde && fechaVenta < desde) return false;
+      if (hasta && fechaVenta > hasta) return false;
+      return true;
+    });
+  })();
+
   useEffect(() => {
     fetchReporteVentas().then(setDataVentas).catch(console.error);
     fetchReporteProductos().then(res => {
@@ -33,6 +51,16 @@ export default function Reportes() {
       setDistribucionServicios(res.distribucion || []);
     }).catch(console.error);
   }, []);
+
+  const handleGenerarReporte = () => {
+    setFiltroAplicado(true);
+  };
+
+  const handleLimpiarFiltro = () => {
+    setFechaInicio('');
+    setFechaFin('');
+    setFiltroAplicado(false);
+  };
 
   // Helpers for Services Pie Chart
   const pieColors = ['#1A56DB', '#a855f7', '#f59e0b', '#10b981'];
@@ -189,33 +217,64 @@ export default function Reportes() {
             <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4">
                <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Fecha inicio</label>
-                  <input type="date" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 p-2.5 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fechaInicio}
+                    onChange={e => { setFechaInicio(e.target.value); setFiltroAplicado(false); }}
+                  />
                </div>
                <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Fecha fin</label>
-                  <input type="date" className="w-full border border-gray-300 p-2.5 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500" />
-               </div>
-               <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Cliente</label>
-                  <select className="w-full border border-gray-300 p-2.5 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
-                    <option>Todos los clientes</option>
-                  </select>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 p-2.5 rounded-lg text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500"
+                    value={fechaFin}
+                    onChange={e => { setFechaFin(e.target.value); setFiltroAplicado(false); }}
+                    min={fechaInicio || undefined}
+                  />
                </div>
                <div className="flex items-end">
-                  <button className="w-full bg-[#1a56db] text-white p-2.5 rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors">
+                  <button
+                    onClick={handleGenerarReporte}
+                    className="w-full bg-[#1a56db] text-white p-2.5 rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors"
+                  >
                     Generar Reporte
+                  </button>
+               </div>
+               <div className="flex items-end">
+                  <button
+                    onClick={handleLimpiarFiltro}
+                    disabled={!filtroAplicado && !fechaInicio && !fechaFin}
+                    className="w-full border border-gray-300 bg-white text-gray-600 p-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Limpiar filtro
                   </button>
                </div>
             </div>
 
+            {/* Indicador de filtro activo */}
+            {filtroAplicado && (fechaInicio || fechaFin) && (
+              <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+                </svg>
+                <span className="font-semibold">Filtro activo:</span>
+                {fechaInicio && <span>Desde <strong>{new Date(fechaInicio + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
+                {fechaInicio && fechaFin && <span>—</span>}
+                {fechaFin && <span>Hasta <strong>{new Date(fechaFin + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>}
+                <span className="ml-1 text-blue-600">· {ventasFiltradas.length} resultado{ventasFiltradas.length !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+
             <div className="flex gap-6">
               <div className="flex-1 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Total Ventas</h3>
-                <h2 className="text-3xl font-bold text-gray-900">${dataVentas.reduce((acc, v) => acc + v.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</h2>
+                <h2 className="text-3xl font-bold text-gray-900">${ventasFiltradas.reduce((acc, v) => acc + v.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</h2>
               </div>
               <div className="flex-1 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-500 mb-2 uppercase tracking-wide">Número Ventas</h3>
-                <h2 className="text-3xl font-bold text-gray-900">{dataVentas.length}</h2>
+                <h2 className="text-3xl font-bold text-gray-900">{ventasFiltradas.length}</h2>
               </div>
             </div>
 
@@ -234,7 +293,7 @@ export default function Reportes() {
                     </tr>
                   </thead>
                   <tbody>
-                    {dataVentas.map((v) => (
+                    {ventasFiltradas.map((v) => (
                       <tr key={v.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-4 px-2 text-sm font-medium text-gray-900">{v.id}</td>
                         <td className="py-4 px-2 text-sm text-gray-600">{v.cliente}</td>
@@ -256,9 +315,13 @@ export default function Reportes() {
                         </td>
                       </tr>
                     ))}
-                    {dataVentas.length === 0 && (
+                    {ventasFiltradas.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="py-8 text-center text-gray-500 text-sm">No hay ventas registradas</td>
+                        <td colSpan="6" className="py-8 text-center text-gray-500 text-sm">
+                          {filtroAplicado && (fechaInicio || fechaFin)
+                            ? 'No hay ventas en el rango de fechas seleccionado.'
+                            : 'No hay ventas registradas'}
+                        </td>
                       </tr>
                     )}
                   </tbody>

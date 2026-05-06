@@ -322,6 +322,15 @@ export default function Compras() {
                     </button>
                   </div>
                   
+                  {/* Column headers */}
+                  <div className="hidden sm:flex gap-3 mb-1 text-xs font-semibold text-gray-500 px-1">
+                    <div className="flex-1">Producto</div>
+                    <div className="w-20 text-center">Cantidad</div>
+                    <div className="w-24 text-center">Precio unitario</div>
+                    <div className="w-24 text-center">Total</div>
+                    <div className="w-6"></div>
+                  </div>
+
                   {nuevo.productos.map((prod, index) => (
                     <div key={prod.id} className="flex flex-col sm:flex-row gap-3 mb-3 items-center">
                       <div className="flex-1">

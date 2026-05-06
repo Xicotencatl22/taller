@@ -12,8 +12,8 @@ export default function Ventas() {
 
   const [nuevaVenta, setNuevaVenta] = useState({
     idUsuarios: '',
-    idProductos: '',
-    metodo_pago: '1', // 1: Efectivo, 2: Tarjeta, 3: Transferencia
+    metodo_pago: '1',
+    productos: [], // Array of { idproductos, nombre, precio_venta, cantidad, subtotal }
     total: 0
   });
 
@@ -50,23 +50,59 @@ export default function Ventas() {
     (v.producto_nombre || '').toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  const agregarProducto = (id) => {
+    const prod = productos.find(p => p.idproductos === Number(id));
+    if (!prod) return;
+
+    const existe = nuevaVenta.productos.find(p => p.idproductos === prod.idproductos);
+    if (existe) {
+      actualizarCantidad(prod.idproductos, existe.cantidad + 1);
+    } else {
+      const nuevosProductos = [...nuevaVenta.productos, { ...prod, cantidad: 1, subtotal: prod.precio_venta }];
+      const nuevoTotal = nuevosProductos.reduce((acc, p) => acc + p.subtotal, 0);
+      setNuevaVenta({ ...nuevaVenta, productos: nuevosProductos, total: nuevoTotal });
+    }
+  };
+
+  const actualizarCantidad = (id, cant) => {
+    const nuevosProductos = nuevaVenta.productos.map(p => {
+      if (p.idproductos === id) {
+        const nc = Math.max(1, Number(cant));
+        return { ...p, cantidad: nc, subtotal: nc * p.precio_venta };
+      }
+      return p;
+    });
+    const nuevoTotal = nuevosProductos.reduce((acc, p) => acc + p.subtotal, 0);
+    setNuevaVenta({ ...nuevaVenta, productos: nuevosProductos, total: nuevoTotal });
+  };
+
+  const eliminarProducto = (id) => {
+    const nuevosProductos = nuevaVenta.productos.filter(p => p.idproductos !== id);
+    const nuevoTotal = nuevosProductos.reduce((acc, p) => acc + p.subtotal, 0);
+    setNuevaVenta({ ...nuevaVenta, productos: nuevosProductos, total: nuevoTotal });
+  };
+
   const manejarEnvio = async (e) => {
     e.preventDefault();
+    if (nuevaVenta.productos.length === 0) return alert('Agrega al menos un producto');
+
     try {
-      // Buscar el precio del producto seleccionado
-      const prod = productos.find(p => p.idproductos === Number(nuevaVenta.idProductos));
       const payload = {
-        ...nuevaVenta,
         idUsuarios: Number(nuevaVenta.idUsuarios),
-        idProductos: Number(nuevaVenta.idProductos),
         metodo_pago: Number(nuevaVenta.metodo_pago),
-        total: prod ? prod.precio_venta : 0
+        total: nuevaVenta.total,
+        productos: nuevaVenta.productos.map(p => ({
+          idproductos: p.idproductos,
+          cantidad: p.cantidad,
+          precio_venta: p.precio_venta,
+          subtotal: p.subtotal
+        }))
       };
 
       await createVenta(payload);
       await loadData();
       setShowModal(false);
-      setNuevaVenta({ idUsuarios: '', idProductos: '', metodo_pago: '1', total: 0 });
+      setNuevaVenta({ idUsuarios: '', metodo_pago: '1', productos: [], total: 0 });
     } catch (err) {
       alert(`Error: ${err.message}`);
     }
@@ -149,7 +185,7 @@ export default function Ventas() {
                 <tr>
                   <th className="px-6 py-4">ID</th>
                   <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4">Producto</th>
+                  <th className="px-6 py-4">Producto(s)</th>
                   <th className="px-6 py-4">Fecha</th>
                   <th className="px-6 py-4">Método</th>
                   <th className="px-6 py-4">Total</th>
@@ -168,7 +204,7 @@ export default function Ventas() {
                         <div className="text-sm font-bold text-gray-900">{v.cliente}</div>
                         <div className="text-xs text-gray-500">{v.cliente_correo}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{v.producto_nombre}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{v.producto_nombre}</td>
                       <td className="px-6 py-4 text-sm text-gray-500">{formatFecha(v.fecha)}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
@@ -178,7 +214,7 @@ export default function Ventas() {
                           {getMetodoPago(v.metodo_pago)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">${v.total.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900">${Number(v.total).toLocaleString()}</td>
                     </tr>
                   ))
                 )}
@@ -191,7 +227,7 @@ export default function Ventas() {
       {/* Modal Nueva Venta */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden text-left">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden text-left">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900">Registrar Venta</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -201,52 +237,88 @@ export default function Ventas() {
               </button>
             </div>
             <form onSubmit={manejarEnvio} className="p-6 space-y-5">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Cliente</label>
-                <select 
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={nuevaVenta.idUsuarios}
-                  onChange={e => setNuevaVenta({...nuevaVenta, idUsuarios: e.target.value})}
-                >
-                  <option value="">Seleccionar cliente</option>
-                  {usuarios.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Cliente</label>
+                  <select 
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={nuevaVenta.idUsuarios}
+                    onChange={e => setNuevaVenta({...nuevaVenta, idUsuarios: e.target.value})}
+                  >
+                    <option value="">Seleccionar cliente</option>
+                    {usuarios.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Método de Pago</label>
+                  <select 
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={nuevaVenta.metodo_pago}
+                    onChange={e => setNuevaVenta({...nuevaVenta, metodo_pago: e.target.value})}
+                  >
+                    <option value="1">Efectivo</option>
+                    <option value="2">Tarjeta de Crédito/Débito</option>
+                    <option value="3">Transferencia Bancaria</option>
+                  </select>
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Producto / Refacción</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Agregar Producto / Refacción</label>
                 <select 
-                  required
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={nuevaVenta.idProductos}
-                  onChange={e => setNuevaVenta({...nuevaVenta, idProductos: e.target.value})}
+                  value=""
+                  onChange={e => agregarProducto(e.target.value)}
                 >
-                  <option value="">Seleccionar producto</option>
+                  <option value="">Seleccionar producto para añadir...</option>
                   {productos.map(p => (
                     <option key={p.idproductos} value={p.idproductos}>{p.nombre} (${p.precio_venta})</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Método de Pago</label>
-                <select 
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={nuevaVenta.metodo_pago}
-                  onChange={e => setNuevaVenta({...nuevaVenta, metodo_pago: e.target.value})}
-                >
-                  <option value="1">Efectivo</option>
-                  <option value="2">Tarjeta de Crédito/Débito</option>
-                  <option value="3">Transferencia Bancaria</option>
-                </select>
+
+              {/* Lista de productos seleccionados */}
+              <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                {nuevaVenta.productos.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-4 border-2 border-dashed border-gray-100 rounded-xl">No hay productos añadidos</p>
+                )}
+                {nuevaVenta.productos.map(p => (
+                  <div key={p.idproductos} className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-gray-900">{p.nombre}</div>
+                      <div className="text-xs text-gray-500">${p.precio_venta} c/u</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        min="1"
+                        className="w-16 px-2 py-1 border border-gray-200 rounded text-center text-sm"
+                        value={p.cantidad}
+                        onChange={e => actualizarCantidad(p.idproductos, e.target.value)}
+                      />
+                      <div className="w-20 text-right text-sm font-bold text-gray-900">${p.subtotal}</div>
+                      <button 
+                        type="button"
+                        onClick={() => eliminarProducto(p.idproductos)}
+                        className="text-red-400 hover:text-red-600 p-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
               
               <div className="bg-blue-50 p-4 rounded-xl mt-4">
                 <div className="flex justify-between items-center text-blue-900 font-bold">
                   <span>Total a cobrar</span>
                   <span className="text-xl">
-                    ${productos.find(p => p.idproductos === Number(nuevaVenta.idProductos))?.precio_venta || 0}
+                    ${nuevaVenta.total.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -261,7 +333,8 @@ export default function Ventas() {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[#1a56db] hover:bg-blue-800 rounded-lg transition"
+                  disabled={nuevaVenta.productos.length === 0}
+                  className={`flex-1 px-4 py-2.5 text-sm font-bold text-white rounded-lg transition ${nuevaVenta.productos.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#1a56db] hover:bg-blue-800'}`}
                 >
                   Confirmar Venta
                 </button>
@@ -272,4 +345,4 @@ export default function Ventas() {
       )}
     </AdminLayout>
   );
-}
+}

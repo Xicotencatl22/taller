@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import {
   createCotizacion, createCita,
   fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores,
-  fetchServicios,
+  fetchServicios, fetchProductosCompatibles
 } from '../utils/api';
 
 const generateFechas = () => {
@@ -55,6 +55,7 @@ function FormularioCarro() {
   const [anio, setAnio] = useState([]);
   const [motores, setMotores] = useState([]);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+  const [productosCompatibles, setProductosCompatibles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -80,10 +81,39 @@ function FormularioCarro() {
   }, [currentUser]);
 
   // Suma el costo de los servicios seleccionados usando los datos reales del backend
+  // y ajustando precios según la compatibilidad del modelo seleccionado.
   const getTotalEstimado = () => {
     return form.servicios.reduce((total, nombreServicio) => {
       const s = serviciosDisponibles.find(sv => sv.nombre === nombreServicio);
-      return total + Number(s?.costo || 0);
+      if (!s) return total;
+
+      const costoManoObra = Number(s.manoObra || s.mano_obra || s.manoobra || 0);
+      let costoPartes = 0;
+
+      if (s.refacciones && s.refacciones.length > 0) {
+        s.refacciones.forEach(ref => {
+          // Buscamos si este producto es compatible con el modelo seleccionado
+          const compatible = productosCompatibles.find(pc => String(pc.idproductos || pc.idProductos) === String(ref.id));
+          
+          if (form.idmodelo) {
+            // Si hay modelo seleccionado, SOLO sumamos si es compatible
+            if (compatible) {
+              const precioUnitario = Number(compatible.precio_unitario);
+              const cantidad = Number(compatible.cantidad || ref.cantidad || 1);
+              costoPartes += precioUnitario * cantidad;
+            }
+          } else {
+            // Si NO hay modelo, sumamos todas las refacciones como estimado general
+            const precioUnitario = Number(ref.precio_unitario || 0);
+            const cantidad = Number(ref.cantidad || 1);
+            costoPartes += precioUnitario * cantidad;
+          }
+        });
+      } else {
+        costoPartes = Number(s.refaccionesEstimadas || s.refacciones_estimadas || s.refaccionesestimadas || 0);
+      }
+
+      return total + costoManoObra + costoPartes;
     }, 0);
   };
 
@@ -95,14 +125,33 @@ function FormularioCarro() {
     form.servicios.forEach(nombreServicio => {
       const s = serviciosDisponibles.find(sv => sv.nombre === nombreServicio);
       if (s) {
-        manoObra += Number(s.manoObra || s.costo || 0); // fallback a costo total si no hay desglose
-        partes += Number(s.refaccionesEstimadas || 0);
-        if (s.refacciones && s.refacciones.length > 0) tieneRefacciones = true;
+        manoObra += Number(s.manoObra || s.mano_obra || s.manoobra || 0);
+        
+        let costoPartesServicio = 0;
+        if (s.refacciones && s.refacciones.length > 0) {
+          tieneRefacciones = true;
+          s.refacciones.forEach(ref => {
+            const compatible = productosCompatibles.find(pc => String(pc.idproductos || pc.idProductos) === String(ref.id));
+            
+            if (form.idmodelo) {
+              if (compatible) {
+                const precioUnitario = Number(compatible.precio_unitario);
+                const cantidad = Number(compatible.cantidad || ref.cantidad || 1);
+                costoPartesServicio += precioUnitario * cantidad;
+              }
+            } else {
+              const precioUnitario = Number(ref.precio_unitario || 0);
+              const cantidad = Number(ref.cantidad || 1);
+              costoPartesServicio += precioUnitario * cantidad;
+            }
+          });
+        } else {
+          costoPartesServicio = Number(s.refaccionesEstimadas || s.refacciones_estimadas || s.refaccionesestimadas || 0);
+        }
+        partes += costoPartesServicio;
       }
     });
 
-    // Si todo el costo se fue a mano de obra por el fallback, descontamos las partes (si hubiere, pero si hubiere ya tendria manoObra definida normalmente)
-    // Para no duplicar costo si no habia manoObra definida.
     return { manoObra, partes, tieneRefacciones };
   };
 
@@ -192,6 +241,17 @@ function FormularioCarro() {
       .catch(() => setModelos([]));
   }, [form.idmarca]);
 
+  // Cargar productos compatibles cuando cambia el modelo
+  useEffect(() => {
+    if (!form.idmodelo) {
+      setProductosCompatibles([]);
+      return;
+    }
+    fetchProductosCompatibles(form.idmodelo)
+      .then(data => setProductosCompatibles(data || []))
+      .catch(() => setProductosCompatibles([]));
+  }, [form.idmodelo]);
+
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -259,7 +319,6 @@ function FormularioCarro() {
                         />
                         <span className="text-sm font-medium text-gray-800">
                           {s.nombre}
-                          {s.costo ? <span className="ml-1 text-gray-400 text-xs">(${s.costo})</span> : null}
                         </span>
                       </label>
                     );
@@ -394,7 +453,9 @@ function FormularioCarro() {
               <div className="flex justify-between items-start gap-4">
                 <span>Servicios</span>
                 <span className="font-semibold text-gray-900 text-right">
-                  {form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio General'}
+                  {form.servicios?.filter(name => serviciosDisponibles.some(s => s.nombre === name)).length > 0 
+                    ? form.servicios.filter(name => serviciosDisponibles.some(s => s.nombre === name)).join(', ') 
+                    : 'Servicio General'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -462,7 +523,11 @@ function FormularioCarro() {
               </button>
 
               <h2 className="text-xl font-bold text-gray-900 mb-1">Agendar servicio</h2>
-              <p className="text-sm text-gray-500 mb-6 max-w-lg">{form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio seleccionado'}</p>
+              <p className="text-sm text-gray-500 mb-6 max-w-lg">
+                {form.servicios?.filter(name => serviciosDisponibles.some(s => s.nombre === name)).length > 0 
+                  ? form.servicios.filter(name => serviciosDisponibles.some(s => s.nombre === name)).join(', ') 
+                  : 'Servicio seleccionado'}
+              </p>
 
               {/* Stepper */}
               <div className="flex justify-center items-center max-w-xl mx-auto">

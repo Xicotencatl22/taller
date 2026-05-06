@@ -262,12 +262,31 @@ const updateCotizacion = async (req, res) => {
  * // Respuesta: { "message": "Cotización 10 eliminada" }
  */
 const deleteCotizacion = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM cotizacion WHERE idcotizacion = $1', [id]);
-    res.json({ message: `Cotización ${id} eliminada` });
+    await client.query('BEGIN');
+    
+    // Primero eliminamos las citas vinculadas a esta cotización para evitar errores de llave foránea
+    // PostgreSQL convierte todo a minúsculas por defecto, así que usamos idcotizacion y cita
+    await client.query('DELETE FROM cita WHERE idcotizacion = $1', [id]);
+    
+    // Luego eliminamos la cotización
+    const result = await client.query('DELETE FROM cotizacion WHERE idcotizacion = $1', [id]);
+    
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Cotización no encontrada' });
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: `Cotización ${id} eliminada correctamente.` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    await client.query('ROLLBACK');
+    console.error('Error al eliminar cotización:', err);
+    res.status(500).json({ error: err.message || 'Error interno del servidor' });
+  } finally {
+    client.release();
   }
 };
 

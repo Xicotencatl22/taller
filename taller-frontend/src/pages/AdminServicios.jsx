@@ -6,6 +6,11 @@ import {
   updateServicio,
   deleteServicio,
   fetchProductos,
+  fetchMarcas,
+  fetchModelosByMarca,
+  fetchCompatibilidadProducto,
+  addCompatibilidad,
+  deleteCompatibilidad,
 } from '../utils/api';
 
 export default function AdminServicios() {
@@ -33,6 +38,15 @@ export default function AdminServicios() {
   const [editando, setEditando] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [categoriaActiva, setCategoriaActiva] = useState('Todas las categorías');
+
+  // ── Compatibility Modal State ───────────────────────────────────────────────
+  const [showCompatModal, setShowCompatModal] = useState(false);
+  const [compatProducto, setCompatProducto] = useState(null); // { id, nombre }
+  const [compatEntries, setCompatEntries] = useState([]);
+  const [marcas, setMarcas] = useState([]);
+  const [modelos, setModelos] = useState([]);
+  const [compatForm, setCompatForm] = useState({ idMarcas: '', idModelos: '', cantidad: 1, precio_especial: '' });
+  const [loadingCompat, setLoadingCompat] = useState(false);
 
   // Categorías únicas derivadas de los datos del backend
   const categoriasUnicas = [...new Set(servicios.map(s => String(s.categoria)).filter(Boolean))];
@@ -62,6 +76,7 @@ export default function AdminServicios() {
 
   useEffect(() => {
     loadServiciosYProductos();
+    fetchMarcas().then(data => setMarcas(data || [])).catch(() => {});
   }, []);
 
   // Calcular refacciones estimadas sumando el precio_unitario * cantidad
@@ -163,6 +178,61 @@ export default function AdminServicios() {
     });
     setRefaccionSeleccionada('');
     setCantidadRefaccion(1);
+  };
+
+  // ── Compatibility Modal Handlers ────────────────────────────────────────────
+  const abrirCompatModal = async (producto) => {
+    setCompatProducto(producto);
+    setLoadingCompat(true);
+    setShowCompatModal(true);
+    setCompatForm({ idMarcas: '', idModelos: '', cantidad: 1, precio_especial: '' });
+    setModelos([]);
+    try {
+      const data = await fetchCompatibilidadProducto(producto.id);
+      setCompatEntries(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCompat(false);
+    }
+  };
+
+  const handleCompatMarcaChange = async (idMarcas) => {
+    setCompatForm(prev => ({ ...prev, idMarcas, idModelos: '' }));
+    if (idMarcas) {
+      try {
+        const data = await fetchModelosByMarca(idMarcas);
+        setModelos(data || []);
+      } catch { setModelos([]); }
+    } else {
+      setModelos([]);
+    }
+  };
+
+  const handleAddCompat = async () => {
+    if (!compatProducto || !compatForm.idMarcas || !compatForm.idModelos) return;
+    try {
+      await addCompatibilidad(compatProducto.id, {
+        idMarcas: compatForm.idMarcas,
+        idModelos: compatForm.idModelos,
+        cantidad: Number(compatForm.cantidad) || 1,
+      });
+      const data = await fetchCompatibilidadProducto(compatProducto.id);
+      setCompatEntries(data || []);
+      setCompatForm({ idMarcas: '', idModelos: '', cantidad: 1, precio_especial: '' });
+      setModelos([]);
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
+  const handleDeleteCompat = async (id) => {
+    try {
+      await deleteCompatibilidad(id);
+      setCompatEntries(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+    }
   };
 
   // Stats calculadas desde datos reales
@@ -288,12 +358,107 @@ export default function AdminServicios() {
                       <div className="text-gray-900 font-medium">{tiempoEstimado} h</div>
                     </div>
                   </div>
+
+                  {/* Refacciones con botón de compatibilidad */}
+                  {s.refacciones && s.refacciones.length > 0 && (
+                    <div className="border-t border-gray-100 pt-4 mt-1">
+                      <div className="text-xs text-gray-500 font-medium mb-2">Refacciones → Gestionar compatibilidad por modelo</div>
+                      <div className="flex flex-wrap gap-2">
+                        {s.refacciones.map(r => (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => abrirCompatModal({ id: r.id, nombre: r.nombre })}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-100 transition"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25" /></svg>
+                            {r.nombre}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* ── Compatibility Modal ───────────────────────────────────────────── */}
+      {showCompatModal && compatProducto && (
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Compatibilidad por Vehículo</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Refacción: <span className="font-semibold text-blue-700">{compatProducto.nombre}</span></p>
+              </div>
+              <button onClick={() => setShowCompatModal(false)} className="text-gray-400 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Existing entries */}
+              {loadingCompat ? (
+                <p className="text-center text-gray-400 py-6">Cargando...</p>
+              ) : compatEntries.length === 0 ? (
+                <p className="text-center text-gray-400 py-6">Sin compatibilidades registradas. Agrega la primera abajo.</p>
+              ) : (
+                <div className="space-y-2">
+                  {compatEntries.map(e => (
+                    <div key={e.id} className="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                      <div className="text-sm">
+                        <span className="font-semibold text-gray-800">{e.marca_nombre}</span>
+                        {e.modelo_nombre && <span className="text-gray-500"> · {e.modelo_nombre}</span>}
+                        <span className="ml-3 text-gray-500">x{e.cantidad}</span>
+                      </div>
+                      <button onClick={() => handleDeleteCompat(e.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new compatibility */}
+              <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
+                <h3 className="text-sm font-bold text-blue-900 mb-4">Agregar Compatibilidad</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Marca *</label>
+                    <select value={compatForm.idMarcas} onChange={e => handleCompatMarcaChange(e.target.value)}
+                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                      <option value="">-- Selecciona marca --</option>
+                      {marcas.map(m => <option key={m.idmarca} value={m.idmarca}>{m.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Modelo *</label>
+                    <select value={compatForm.idModelos} onChange={e => setCompatForm(prev => ({ ...prev, idModelos: e.target.value }))}
+                      disabled={!compatForm.idMarcas || modelos.length === 0}
+                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100">
+                      <option value="">-- Selecciona modelo --</option>
+                      {modelos.map(m => <option key={m.idmodelo} value={m.idmodelo}>{m.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Cantidad usada</label>
+                    <input type="number" min="1" value={compatForm.cantidad}
+                      onChange={e => setCompatForm(prev => ({ ...prev, cantidad: e.target.value }))}
+                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+                <button onClick={handleAddCompat} disabled={!compatForm.idMarcas || !compatForm.idModelos}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                  Agregar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (

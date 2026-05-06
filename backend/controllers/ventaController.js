@@ -13,11 +13,12 @@ const getVentas = async (req, res) => {
         v.fecha,
         u.nombre as cliente,
         u.email as cliente_correo,
-        p.nombre as producto_nombre,
-        p.precio_venta as precio_unitario
+        STRING_AGG(p.nombre, ', ') as producto_nombre
       FROM Venta v
       LEFT JOIN Usuarios u ON v.idUsuarios = u.idUsuarios
-      LEFT JOIN Productos p ON v.idProductos = p.idProductos
+      LEFT JOIN DetalleVenta dv ON v.idVenta = dv.idVenta
+      LEFT JOIN Productos p ON dv.idProductos = p.idProductos
+      GROUP BY v.idVenta, u.nombre, u.email
       ORDER BY v.idVenta DESC
     `);
     res.json(result.rows);
@@ -30,25 +31,42 @@ const getVentas = async (req, res) => {
  * POST /api/ventas
  */
 const createVenta = async (req, res) => {
-  const { idProductos, idUsuarios, metodo_pago, total } = req.body;
+  const { idUsuarios, metodo_pago, total, productos } = req.body;
+  const client = await pool.connect();
+  
   try {
-    const result = await pool.query(
-      `INSERT INTO Venta (idProductos, idUsuarios, metodo_pago, total)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [idProductos, idUsuarios, metodo_pago, total]
+    await client.query('BEGIN');
+
+    // 1. Insert Venta (idProductos will be NULL or the first one if we want backward compatibility, but let's use NULL)
+    const resultVenta = await client.query(
+      `INSERT INTO Venta (idUsuarios, metodo_pago, total)
+       VALUES ($1, $2, $3) RETURNING idVenta`,
+      [idUsuarios, metodo_pago, total]
     );
-    
-    // Si la venta se registra, deberíamos descontar el stock del producto
-    if (idProductos) {
-      await pool.query(
-        'UPDATE Productos SET stock_actual = stock_actual - 1 WHERE idProductos = $1',
-        [idProductos]
+    const idVenta = resultVenta.rows[0].idventa;
+
+    // 2. Insert DetalleVenta and update stock for each product
+    for (const prod of productos) {
+      await client.query(
+        `INSERT INTO DetalleVenta (idVenta, idProductos, cantidad, precio_unitario, subtotal)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [idVenta, prod.idproductos, prod.cantidad, prod.precio_venta, prod.subtotal]
+      );
+
+      // Decrement stock
+      await client.query(
+        'UPDATE Productos SET stock_actual = stock_actual - $1 WHERE idProductos = $2',
+        [prod.cantidad, prod.idproductos]
       );
     }
 
-    res.status(201).json(result.rows[0]);
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, idVenta });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 };
 

@@ -11,13 +11,15 @@ router.get('/ventas', async (req, res) => {
       SELECT 
         v.idVenta as id,
         u.nombre AS cliente,
-        p.nombre AS servicio,
+        STRING_AGG(p.nombre || ' x' || dv.cantidad::text, ', ' ORDER BY p.nombre) AS servicio,
         v.fecha,
         v.total,
         v.metodo_pago
       FROM Venta v
       LEFT JOIN Usuarios u ON u.idUsuarios = v.idUsuarios
-      LEFT JOIN Productos p ON p.idProductos = v.idProductos
+      LEFT JOIN DetalleVenta dv ON dv.idVenta = v.idVenta
+      LEFT JOIN Productos p ON p.idProductos = dv.idProductos
+      GROUP BY v.idVenta, u.nombre, v.fecha, v.total, v.metodo_pago
       ORDER BY v.fecha DESC
     `);
 

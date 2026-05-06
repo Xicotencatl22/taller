@@ -7,12 +7,17 @@ import {
   fetchProductos,
   fetchMantenimientos,
   createMantenimiento,
-  updateMantenimientoEstado
+  updateMantenimientoEstado,
+  fetchCitas,
+  updateCita,
+  fetchProductosCompatibles
 } from '../utils/api';
 
 export default function AdminMantenimiento() {
   const [mantenimientos, setMantenimientos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [citasPendientes, setCitasPendientes] = useState([]);
+  const [selectedCitaId, setSelectedCitaId] = useState('');
 
   // Catálogos
   const [clientes, setClientes] = useState([]);
@@ -42,12 +47,13 @@ export default function AdminMantenimiento() {
 
   const loadData = async () => {
     try {
-      const [uRes, vRes, sRes, pRes, mRes] = await Promise.all([
+      const [uRes, vRes, sRes, pRes, mRes, cRes] = await Promise.all([
         fetchUsers(),
         fetchVehiculos(),
         fetchServicios(),
         fetchProductos(),
-        fetchMantenimientos()
+        fetchMantenimientos(),
+        fetchCitas()
       ]);
       
       const allUsers = uRes || [];
@@ -57,6 +63,50 @@ export default function AdminMantenimiento() {
       setServiciosDb(sRes || []);
       setProductosDb(pRes || []);
       setMantenimientos(mRes || []);
+
+      if (cRes) {
+        const pendientes = cRes.filter(c => c.estado === 'Pendiente' || c.estado === 'Confirmada');
+        const parsedCitas = pendientes.map(cita => {
+          let extrCliente = cita.cliente || 'Cliente sin nombre';
+          let extrEmail = cita.email || '';
+          let extrVehiculo = cita.vehiculo || 'Vehículo no definido';
+          let extrServicios = [];
+          let extrNotas = '';
+
+          if (cita.nota) {
+             const parts = cita.nota.split(' | ');
+             parts.forEach(p => {
+               if (p.startsWith('Cliente:')) {
+                 const cInfo = p.replace('Cliente:', '').split('-');
+                 extrCliente = cInfo[0].trim();
+                 if (cInfo[1] && cInfo[1].includes('@')) extrEmail = cInfo[1].trim();
+               }
+               if (p.startsWith('Vehículo:')) {
+                 extrVehiculo = p.replace('Vehículo:', '').trim();
+               }
+               if (p.startsWith('Servicios:')) {
+                 const srvStr = p.replace('Servicios:', '').trim();
+                 if (srvStr && srvStr !== 'Servicio no definido') {
+                    extrServicios = srvStr.split(',').map(s => s.trim());
+                 }
+               }
+               if (p.startsWith('Notas:')) {
+                 extrNotas = p.replace('Notas:', '').trim();
+               }
+             });
+          }
+
+          return {
+            ...cita,
+            parsedCliente: extrCliente,
+            parsedEmail: extrEmail,
+            parsedVehiculo: extrVehiculo,
+            parsedServicios: extrServicios,
+            parsedNotas: extrNotas
+          };
+        });
+        setCitasPendientes(parsedCitas);
+      }
     } catch (err) {
       console.error('Error loading mantenimiento data:', err);
     } finally {
@@ -84,7 +134,12 @@ export default function AdminMantenimiento() {
         return;
       }
 
-      setTrabajos([...trabajos, { id: srv.id, nombre: srv.nombre, precio: srv.costo, descripcion: srv.descripcion }]);
+      setTrabajos([...trabajos, { 
+        id: srv.id, 
+        nombre: srv.nombre, 
+        precio: srv.manoObra || srv.mano_obra || srv.manoobra || srv.costo || 0, 
+        descripcion: srv.descripcion 
+      }]);
       setNuevoTrabajoId('');
 
       // Auto-cargar refacciones asociadas al servicio
@@ -105,6 +160,57 @@ export default function AdminMantenimiento() {
         });
         setRefacciones(refsActuales);
       }
+    }
+  };
+
+  const handleCitaSelect = (citaId) => {
+    setSelectedCitaId(citaId);
+    if (!citaId) return;
+
+    const cita = citasPendientes.find(c => String(c.id) === String(citaId));
+    if (!cita) return;
+
+    let clienteEmail = nuevo.clienteCorreo;
+    
+    // Try to match client by email or name
+    if (cita.parsedEmail) {
+      const match = clientes.find(c => c.email.toLowerCase() === cita.parsedEmail.toLowerCase());
+      if (match) clienteEmail = match.email;
+    } else {
+      const match = clientes.find(c => c.name.toLowerCase() === cita.parsedCliente.toLowerCase());
+      if (match) clienteEmail = match.email;
+    }
+
+    setNuevo(prev => ({
+      ...prev,
+      clienteCorreo: clienteEmail,
+      observaciones: cita.parsedNotas ? `Notas de la cita: ${cita.parsedNotas}` : ''
+    }));
+
+    // Auto-load services
+    if (cita.parsedServicios.length > 0) {
+       const matchedServicios = serviciosDb.filter(s => cita.parsedServicios.some(ps => ps.toLowerCase() === s.nombre.toLowerCase()));
+       if (matchedServicios.length > 0) {
+            const nuevosTrabajos = matchedServicios.map(srv => ({ 
+              id: srv.id, 
+              nombre: srv.nombre, 
+              precio: srv.manoObra || srv.mano_obra || srv.manoobra || srv.costo || 0, 
+              descripcion: srv.descripcion 
+            }));
+           setTrabajos(nuevosTrabajos);
+           
+           let refsActuales = [];
+           matchedServicios.forEach(srv => {
+               if (srv.refacciones && Array.isArray(srv.refacciones)) {
+                   srv.refacciones.forEach(sr => {
+                      const existe = refsActuales.find(r => r.id === sr.id);
+                      if (existe) existe.cantidad += sr.cantidad;
+                      else refsActuales.push({ id: sr.id, nombre: sr.nombre, precio_unitario: sr.precio_unitario, cantidad: sr.cantidad });
+                   });
+               }
+           });
+           setRefacciones(refsActuales);
+       }
     }
   };
 
@@ -154,6 +260,12 @@ export default function AdminMantenimiento() {
       };
 
       await createMantenimiento(payload);
+
+      // Si hay una cita vinculada, marcarla como Atendida
+      if (selectedCitaId) {
+        await updateCita(selectedCitaId, { estado: 'Atendida' });
+      }
+
       await loadData();
       cerrarModal();
     } catch (err) {
@@ -178,6 +290,7 @@ export default function AdminMantenimiento() {
     setRefacciones([]);
     setNuevoTrabajoId('');
     setNuevaRefaccion({ id: '', cantidad: 1 });
+    setSelectedCitaId('');
   };
 
   const totalCompletados = mantenimientos.filter(m => m.estado === 'Completado').length;
@@ -311,6 +424,24 @@ export default function AdminMantenimiento() {
             <div className="p-6 overflow-y-auto flex-1 text-left space-y-6">
               <form id="mantenimientoForm" onSubmit={manejarEnvio}>
 
+                {citasPendientes.length > 0 && (
+                  <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-6 mb-6">
+                    <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2 mb-4">
+                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      Vincular con Cita Pendiente
+                    </h3>
+                    <select className="w-full px-4 py-2.5 border border-purple-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                      value={selectedCitaId} onChange={(e) => handleCitaSelect(e.target.value)}>
+                      <option value="">-- Opcional: Selecciona una cita para autocompletar --</option>
+                      {citasPendientes.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.parsedCliente} - {c.parsedVehiculo} (Fecha: {c.fecha || 'N/A'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="bg-blue-50/30 border border-blue-50 rounded-xl p-6 mb-6">
                   <h3 className="text-sm font-bold text-blue-900 flex items-center gap-2 mb-4">
                     <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
@@ -328,7 +459,31 @@ export default function AdminMantenimiento() {
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Vehículo Asociado *</label>
                       <select required disabled={!nuevo.clienteCorreo} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        value={nuevo.idVehiculos} onChange={e => setNuevo({ ...nuevo, idVehiculos: e.target.value })}>
+                        value={nuevo.idVehiculos}
+                        onChange={async (e) => {
+                          const vehiculoId = e.target.value;
+                          setNuevo(prev => ({ ...prev, idVehiculos: vehiculoId }));
+
+                          // Auto-load compatible parts for this vehicle's model
+                          if (vehiculoId) {
+                            const vehiculo = vehiculosDb.find(v => String(v.id) === String(vehiculoId));
+                            if (vehiculo && vehiculo.idmodelos) {
+                              try {
+                                const compatibles = await fetchProductosCompatibles(vehiculo.idmodelos);
+                                if (compatibles && compatibles.length > 0) {
+                                  setRefacciones(compatibles.map(cp => ({
+                                    id: cp.idproductos,
+                                    nombre: cp.nombre,
+                                    precio_unitario: Number(cp.precio_unitario),
+                                    cantidad: cp.cantidad
+                                  })));
+                                }
+                              } catch (err) {
+                                console.error('Error cargando refacciones compatibles:', err);
+                              }
+                            }
+                          }
+                        }}>
                         <option value="">-- Selecciona el vehículo --</option>
                         {vehiculosCliente.map(v => <option key={v.id} value={v.id}>{v.marca} {v.modelo} • {v.placa}</option>)}
                       </select>
@@ -377,12 +532,21 @@ export default function AdminMantenimiento() {
                     Trabajos Realizados (Servicios)
                   </h3>
 
+                  {trabajos.length > 0 && (
+                    <div className="flex gap-2 mb-2 px-1 text-[10px] font-bold text-green-700 uppercase tracking-wider">
+                      <div className="w-1/3 px-4">Servicio</div>
+                      <div className="flex-1 px-4">Descripción</div>
+                      <div className="w-32 px-4">Mano de obra</div>
+                      <div className="w-10"></div>
+                    </div>
+                  )}
+
                   {trabajos.map(t => (
                     <div key={t.id} className="flex gap-2 mb-3 items-center">
-                      <div className="w-1/3 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{t.nombre}</div>
-                      <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate">{t.descripcion || '-'}</div>
-                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm">${t.precio}</div>
-                      <button type="button" onClick={() => eliminarTrabajo(t.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                      <div className="w-1/3 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate font-medium">{t.nombre}</div>
+                      <div className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm truncate text-gray-500">{t.descripcion || '-'}</div>
+                      <div className="w-32 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900">${t.precio}</div>
+                      <button type="button" onClick={() => eliminarTrabajo(t.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
@@ -393,7 +557,11 @@ export default function AdminMantenimiento() {
                       <select className="w-full px-4 py-2.5 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white"
                         value={nuevoTrabajoId} onChange={handleServicioChange}>
                         <option value="">Seleccione un servicio del catálogo</option>
-                        {serviciosDb.map(s => <option key={s.id} value={s.id}>{s.nombre} (${s.costo})</option>)}
+                        {serviciosDb.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.nombre} (Mano de obra: ${s.manoObra || s.mano_obra || s.costo})
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <button type="button" onClick={agregarTrabajo} className="px-4 py-2.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition font-bold whitespace-nowrap">

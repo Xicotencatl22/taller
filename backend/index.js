@@ -33,6 +33,7 @@ const servicioRoutes = require('./routes/servicioRoutes');
 const citaRoutes = require('./routes/citaRoutes');
 const cotizacionRoutes = require('./routes/cotizacionRoutes');
 const productoRoutes = require('./routes/productoRoutes');
+const compatibilidadRoutes = require('./routes/compatibilidadRoutes');
 const ventaRoutes = require('./routes/ventaRoutes');
 const comprasRoutes = require('./routes/compraRoutes');
 const proveedoresRoutes = require('./routes/proveedorRoutes');
@@ -41,6 +42,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const proveedorRoutes = require('./routes/proveedorRoutes');
 const compraRoutes = require('./routes/compraRoutes');
 const reportesRoutes = require('./routes/reportes');
+const catalogoRoutes = require('./routes/catalogoRoutes');
 
 const app = express();
 app.use(cors());
@@ -233,15 +235,28 @@ const initializeDatabase = async () => {
       stock_minimo INTEGER,
       stock_actual INTEGER DEFAULT 0,
       categoria VARCHAR(100),
-      sku VARCHAR(50),
-      ubicacion_almacen VARCHAR(100)
+      sku VARCHAR(50) UNIQUE,
+      ubicacion_almacen VARCHAR(100),
+      marca VARCHAR(100)
     );
   `);
 
   // Migración: agregar columnas si no existen en versiones anteriores de la tabla
   await pool.query(`ALTER TABLE Productos ADD COLUMN IF NOT EXISTS stock_actual INTEGER DEFAULT 0`).catch(() => {});
   await pool.query(`ALTER TABLE Productos ADD COLUMN IF NOT EXISTS ubicacion_almacen VARCHAR(100)`).catch(() => {});
+  await pool.query(`ALTER TABLE Productos ADD COLUMN IF NOT EXISTS marca VARCHAR(100)`).catch(() => {});
   await pool.query(`ALTER TABLE Productos ALTER COLUMN categoria TYPE VARCHAR(100) USING categoria::text`).catch(() => {});
+  // Agregar constraint UNIQUE en sku si no existe
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'productos_sku_key'
+        AND conrelid = 'Productos'::regclass
+      ) THEN
+        ALTER TABLE Productos ADD CONSTRAINT productos_sku_key UNIQUE (sku);
+      END IF;
+    END $$;
+  `).catch(() => {});
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS Servicios (
@@ -401,7 +416,7 @@ const initializeDatabase = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS Cita (
       idCita SERIAL PRIMARY KEY,
-      idCotizacion INTEGER REFERENCES Cotizacion(idCotizacion),
+      idCotizacion INTEGER REFERENCES Cotizacion(idCotizacion) ON DELETE CASCADE,
       idUsuarios INTEGER REFERENCES Usuarios(idUsuarios),
       fecha DATE,
       hora TIME,
@@ -498,6 +513,8 @@ app.use('/api/cliente', clienteRoutes);
 
 // Nuevas Rutas (Preparadas para conectarse después)
 app.use('/api/citas', citaRoutes);
+// Compatibilidad de productos por modelo de vehículo (debe ir ANTES de productoRoutes)
+app.use('/api/productos', compatibilidadRoutes);
 app.use('/api/productos', productoRoutes);
 app.use('/api/servicios', servicioRoutes);
 app.use('/api/cotizaciones', cotizacionRoutes);
@@ -509,6 +526,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/compras', compraRoutes);
 app.use('/api/reportes', reportesRoutes);
+app.use('/api/catalogo', catalogoRoutes);
+
 
 // ---------------------------------------------------------------------------
 // Endpoints de Roles (CRUD inline)
