@@ -414,7 +414,7 @@ function AdminDashboard() {
             </svg>
           </button>
           <div className="text-sm text-gray-500 font-medium">
-            domingo, 22 de marzo de 2026
+            miércoles, 13 de mayo de 2026
           </div>
         </header>
 
