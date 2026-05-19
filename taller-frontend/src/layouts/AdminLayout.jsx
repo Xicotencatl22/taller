@@ -41,38 +41,38 @@ export default function AdminLayout({ children, activeTab, onTabClick }) {
     <div className="flex h-screen bg-gray-50 text-left overflow-hidden">
       {isSidebarVisible && (
         <aside className="w-64 bg-[#1e3a8a] text-white flex flex-col h-full shrink-0">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677h3.351a.75.75 0 01.696.471z" />
-            </svg>
+          <div className="p-6 flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677h3.351a.75.75 0 01.696.471z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-bold text-lg leading-tight">San Jorge</h1>
+              <p className="text-[10px] text-blue-200 uppercase tracking-widest">Panel Admin</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-bold text-lg leading-tight">San Jorge</h1>
-            <p className="text-[10px] text-blue-200 uppercase tracking-widest">Panel Admin</p>
-          </div>
-        </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-          {menu.map((item) => (
-            <button key={item.id} onClick={() => handleTabClick(item)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${activeTab === item.id ? 'bg-blue-600 text-white' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}>
-               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 ${activeTab === item.id ? '' : 'opacity-70'}`}>
-                 <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-               </svg>
-               {item.label}
-            </button>
-          ))}
-        </nav>
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            {menu.map((item) => (
+              <button key={item.id} onClick={() => handleTabClick(item)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm transition-colors ${activeTab === item.id ? 'bg-blue-600 text-white' : 'text-blue-200 hover:bg-blue-800/50 hover:text-white'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 ${activeTab === item.id ? '' : 'opacity-70'}`}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                {item.label}
+              </button>
+            ))}
+          </nav>
 
-        <div className="p-4 mt-auto">
-           <button onClick={() => navigate('/login')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-200 hover:bg-red-800/50 hover:text-white font-medium text-sm transition-colors">
+          <div className="p-4 mt-auto">
+            <button onClick={() => navigate('/login')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-200 hover:bg-red-800/50 hover:text-white font-medium text-sm transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
               </svg>
               Cerrar sesión
-           </button>
-        </div>
-      </aside>
+            </button>
+          </div>
+        </aside>
       )}
 
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-gray-50/50">
@@ -83,7 +83,7 @@ export default function AdminLayout({ children, activeTab, onTabClick }) {
             </svg>
           </button>
           <div className="text-sm text-gray-500 font-medium">
-            domingo, 22 de marzo de 2026
+            miercoles, 13 de mayo de 2026
           </div>
         </header>
 
