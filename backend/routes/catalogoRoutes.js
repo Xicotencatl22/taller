@@ -57,6 +57,21 @@ router.get('/modelos', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/modelos/marca/:idMarcas', async (req, res) => {
+  const idMarcas = Number(req.params.idMarcas);
+  if (isNaN(idMarcas)) return res.status(400).json({ error: 'idMarcas inválido' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT mo.idModelos AS id, mo.nombre, mo.idMarcas, ma.nombre AS marca
+      FROM Modelos mo
+      LEFT JOIN Marca ma ON ma.idMarcas = mo.idMarcas
+      WHERE mo.idMarcas = $1
+      ORDER BY mo.nombre
+    `, [idMarcas]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/modelos', async (req, res) => {
   const { nombre, idMarcas } = req.body;
   if (!nombre?.trim() || !idMarcas) return res.status(400).json({ error: 'Nombre y marca son requeridos' });

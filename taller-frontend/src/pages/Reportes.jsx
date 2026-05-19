@@ -14,6 +14,13 @@ export default function Reportes() {
   const [servStats, setServStats] = useState({ serviciosRealizados: 0, ingresosPorServicios: 0, ticketPromedio: 0 });
   const [distribucionServicios, setDistribucionServicios] = useState([]);
 
+  // Estado para expandir detalle de venta
+  const [expandedVentaId, setExpandedVentaId] = useState(null);
+
+  const toggleVentaDetalle = (id) => {
+    setExpandedVentaId(expandedVentaId === id ? null : id);
+  };
+
   // Filtros de fecha
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -294,26 +301,49 @@ export default function Reportes() {
                   </thead>
                   <tbody>
                     {ventasFiltradas.map((v) => (
-                      <tr key={v.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-4 px-2 text-sm font-medium text-gray-900">{v.id}</td>
-                        <td className="py-4 px-2 text-sm text-gray-600">{v.cliente}</td>
-                        <td className="py-4 px-2 text-sm text-gray-600">{v.servicio}</td>
-                        <td className="py-4 px-2 text-sm text-gray-600">{v.fecha}</td>
-                        <td className="py-4 px-2 text-sm font-medium text-gray-900">${v.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                        <td className="py-4 px-2">
-                          <span
-                            className={`px-3 py-1 text-white font-semibold rounded-full text-xs uppercase tracking-wide flex w-max ${
-                              v.metodo === "efectivo"
-                                ? "bg-green-500"
-                                : v.metodo === "tarjeta"
-                                ? "bg-[#1a56db]"
-                                : "bg-purple-500"
-                            }`}
-                          >
-                            {v.metodo}
-                          </span>
-                        </td>
-                      </tr>
+                      <React.Fragment key={v.id}>
+                        <tr className={`border-b border-gray-100 hover:bg-gray-50 ${expandedVentaId === v.id ? 'bg-blue-50/30' : ''}`}>
+                          <td className="py-4 px-2 text-sm font-medium text-gray-900">{v.id}</td>
+                          <td className="py-4 px-2 text-sm text-gray-600">{v.cliente}</td>
+                          <td className="py-4 px-2 text-sm text-gray-600">
+                            <button onClick={() => toggleVentaDetalle(v.id)} className="text-[#1a56db] hover:text-blue-800 font-semibold flex items-center gap-1 transition-colors">
+                              {expandedVentaId === v.id ? 'Ocultar detalles' : 'Ver detalles'}
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 transition-transform duration-200 ${expandedVentaId === v.id ? 'rotate-180' : ''}`}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="py-4 px-2 text-sm text-gray-600">{v.fecha}</td>
+                          <td className="py-4 px-2 text-sm font-medium text-gray-900">${v.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                          <td className="py-4 px-2">
+                            <span
+                              className={`px-3 py-1 text-white font-semibold rounded-full text-xs uppercase tracking-wide flex w-max ${
+                                v.metodo === "efectivo"
+                                  ? "bg-green-500"
+                                  : v.metodo === "tarjeta"
+                                  ? "bg-[#1a56db]"
+                                  : "bg-purple-500"
+                              }`}
+                            >
+                              {v.metodo}
+                            </span>
+                          </td>
+                        </tr>
+                        {expandedVentaId === v.id && (
+                          <tr className="bg-blue-50/30 border-b border-blue-100">
+                            <td colSpan="6" className="py-4 px-6 text-sm text-gray-700">
+                              <div className="flex flex-col gap-2 p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                                <div className="font-semibold text-gray-900 text-xs uppercase tracking-wide border-b pb-2">Artículos en esta venta:</div>
+                                <ul className="list-disc pl-5 space-y-1.5 mt-1">
+                                  {v.servicio.split(', ').map((item, idx) => (
+                                    <li key={idx} className="text-gray-600">{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                     {ventasFiltradas.length === 0 && (
                       <tr>

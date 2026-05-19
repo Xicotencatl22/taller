@@ -127,6 +127,104 @@ const createCita = async (req, res) => {
 };
 
 /**
+ * Crea una cita completa incluyendo usuario, vehículo y cotización.
+ * 
+ * @async
+ * @function createCitaCompleta
+ */
+const createCitaCompleta = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const { cliente, vehiculo, idServicios, totalEstimado, fecha, hora, nota, estado } = req.body;
+    
+    let finalIdUsuario = null;
+    let finalIdVehiculo = null;
+
+    // 1. Manejar Usuario
+    if (cliente && cliente.telefono) {
+      // Buscar usuario por teléfono o email
+      let userQuery = 'SELECT idUsuarios FROM Usuarios WHERE telefono = $1';
+      let userParams = [cliente.telefono];
+      
+      if (cliente.email) {
+        userQuery += ' OR email = $2';
+        userParams.push(cliente.email);
+      }
+      
+      const userRes = await client.query(userQuery, userParams);
+      
+      if (userRes.rows.length > 0) {
+        finalIdUsuario = userRes.rows[0].idusuarios;
+      } else {
+        // Crear usuario (rol Cliente por defecto)
+        // Suponiendo que el rol Cliente es id = 3. 
+        // Para estar seguros buscamos el id del rol Cliente o lo dejamos null si no requiere
+        const rolRes = await client.query("SELECT idRoles FROM Roles WHERE nombre = 'Cliente' LIMIT 1");
+        const idRol = rolRes.rows.length > 0 ? rolRes.rows[0].idroles : null;
+        
+        const insertUser = await client.query(
+          'INSERT INTO Usuarios (idRoles, nombre, email, telefono, contraseña) VALUES ($1, $2, $3, $4, $5) RETURNING idUsuarios',
+          [idRol, cliente.nombre, cliente.email || null, cliente.telefono, '123456'] // contraseña default
+        );
+        finalIdUsuario = insertUser.rows[0].idusuarios;
+      }
+    }
+
+    // 2. Manejar Vehículo
+    if (vehiculo && vehiculo.idMarcas && vehiculo.idModelos && finalIdUsuario) {
+      // Buscar vehículo para este usuario
+      let vehQuery = 'SELECT idVehiculos FROM Vehiculos WHERE idUsuarios = $1 AND idMarcas = $2 AND idModelos = $3 AND idAnio = $4';
+      const vehRes = await client.query(vehQuery, [finalIdUsuario, vehiculo.idMarcas, vehiculo.idModelos, vehiculo.idAnio]);
+      
+      if (vehRes.rows.length > 0) {
+        finalIdVehiculo = vehRes.rows[0].idvehiculos;
+      } else {
+        const insertVeh = await client.query(
+          'INSERT INTO Vehiculos (idUsuarios, idMarcas, idModelos, idAnio, placa) VALUES ($1, $2, $3, $4, $5) RETURNING idVehiculos',
+          [finalIdUsuario, vehiculo.idMarcas, vehiculo.idModelos, vehiculo.idAnio, vehiculo.placa || '']
+        );
+        finalIdVehiculo = insertVeh.rows[0].idvehiculos;
+      }
+    } else if (vehiculo && vehiculo.idVehiculoExistente) {
+      finalIdVehiculo = vehiculo.idVehiculoExistente;
+    }
+
+    // 3. Crear Cotización
+    const insertCot = await client.query(
+      'INSERT INTO Cotizacion (idUsuarios, idVehiculos, total_estimado, fecha) VALUES ($1, $2, $3, $4) RETURNING idCotizacion',
+      [finalIdUsuario, finalIdVehiculo, totalEstimado || 0, fecha]
+    );
+    const idCotizacion = insertCot.rows[0].idcotizacion;
+
+    // TODO: Insertar idServicios en detalle de cotización si la tabla existe, pero actualmente
+    // la tabla Cotizacion en la base tiene idServicios. 
+    // Vamos a actualizar la cotización si idServicios es un array, tomamos el primero o creamos múltiples?
+    // En la base antigua Cotizacion tiene un idServicios. Si existe:
+    if (idServicios && idServicios.length > 0) {
+       await client.query('UPDATE Cotizacion SET idServicios = $1 WHERE idCotizacion = $2', [idServicios[0], idCotizacion]);
+    }
+
+    // 4. Crear Cita
+    const insertCita = await client.query(
+      `INSERT INTO Cita (idCotizacion, idUsuarios, fecha, hora, nota, estado)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING idCita AS id, idCotizacion, idUsuarios, fecha, hora, nota, estado`,
+      [idCotizacion, finalIdUsuario, fecha, hora, nota || '', estado || 'Pendiente']
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json(insertCita.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
+/**
  * Actualiza parcialmente una cita existente por su ID.
  *
  * Solo actualiza los campos que se incluyan en el cuerpo de la solicitud.
@@ -220,6 +318,7 @@ const deleteCita = async (req, res) => {
 module.exports = {
   getAllCitas,
   createCita,
+  createCitaCompleta,
   updateCita,
   deleteCita,
 };

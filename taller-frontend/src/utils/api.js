@@ -25,6 +25,10 @@ export const createCita = (data) => request('/api/citas', {
   method: 'POST',
   body: JSON.stringify(data),
 });
+export const createCitaCompleta = (data) => request('/api/citas/completa', {
+  method: 'POST',
+  body: JSON.stringify(data),
+});
 export const updateCita = (id, data) => request(`/api/citas/${id}`, {
   method: 'PATCH',
   body: JSON.stringify(data),
@@ -86,10 +90,10 @@ export const createVenta = (data) => request('/api/ventas', {
 export const fetchDashboardStats = () => request('/api/dashboard/stats');
 
 // ─── Vehículos (catálogos) ────────────────────────────────────────────────────
-export const fetchMarcas = () => request('/api/marca');
-export const fetchModelosByMarca = (idmarca) => request(`/api/modelo/${idmarca}`);
-export const fetchAnios = () => request('/api/anio');
-export const fetchMotores = () => request('/api/motor');
+export const fetchMarcas = () => request('/api/catalogo/marcas');
+export const fetchModelosByMarca = (idmarca) => request(`/api/catalogo/modelos/marca/${idmarca}`);
+export const fetchAnios = () => request('/api/catalogo/anios');
+export const fetchMotores = () => request('/api/catalogo/motores');
 
 // ─── Productos ────────────────────────────────────────────────────────────────
 export const fetchProductos = () => request('/api/productos');

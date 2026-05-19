@@ -14,10 +14,11 @@
  */
 
 const express = require('express');
-const { getAllCitas, createCita, updateCita, deleteCita } = require('../controllers/citaController');
+const { getAllCitas, createCita, createCitaCompleta, updateCita, deleteCita } = require('../controllers/citaController');
 const router = express.Router();
 
 router.get('/', getAllCitas);
+router.post('/completa', createCitaCompleta);
 router.post('/', createCita);
 router.patch('/:id', updateCita);
 router.delete('/:id', deleteCita);
