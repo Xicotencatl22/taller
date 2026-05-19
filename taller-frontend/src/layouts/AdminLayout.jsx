@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const formatCurrentDate = () =>
+  new Date().toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
 export default function AdminLayout({ children, activeTab, onTabClick }) {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const navigate = useNavigate();
@@ -83,7 +91,7 @@ export default function AdminLayout({ children, activeTab, onTabClick }) {
             </svg>
           </button>
           <div className="text-sm text-gray-500 font-medium">
-            miércoles, 13 de mayo de 2026
+            {formatCurrentDate()}
           </div>
         </header>
 

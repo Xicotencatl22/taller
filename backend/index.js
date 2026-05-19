@@ -564,7 +564,16 @@ app.post('/api/roles', async (req, res) => {
       'INSERT INTO Roles (nombre, descripcion, permisos) VALUES ($1, $2, $3) RETURNING idRoles',
       [name.trim(), description.trim(), JSON.stringify(permissions)]
     );
-    const { rows } = await pool.query('SELECT * FROM Roles WHERE idRoles = $1', [result.rows[0].idRoles]);
+    const newRoleId = result.rows[0]?.idroles ?? result.rows[0]?.idRoles;
+    if (!newRoleId) {
+      console.error('Rol creado pero no se obtuvo idRoles del INSERT', result.rows[0]);
+      return res.status(500).json({ error: 'Error interno al crear el rol' });
+    }
+    const { rows } = await pool.query('SELECT * FROM Roles WHERE idRoles = $1', [newRoleId]);
+    if (!rows.length) {
+      console.error('Rol no encontrado después del INSERT', newRoleId);
+      return res.status(500).json({ error: 'Error interno al crear el rol' });
+    }
     res.json(formatRoleRow(rows[0]));
   } catch (err) {
     console.error(err);

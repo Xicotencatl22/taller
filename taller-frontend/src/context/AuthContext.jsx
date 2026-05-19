@@ -129,22 +129,40 @@ export const AuthProvider = ({ children }) => {
 
   const saveRole = async (role) => {
     try {
-      const method = role.id ? 'PUT' : 'POST';
-      const url = role.id ? `${API_BASE}/api/roles/${role.id}` : `${API_BASE}/api/roles`;
+      // If role.id exists but is not a numeric id returned by backend, treat as create (POST)
+      const hasId = role && typeof role.id !== 'undefined' && role.id !== null;
+      const isNumericId = hasId && !Number.isNaN(Number(role.id));
+      const method = isNumericId ? 'PUT' : 'POST';
+      const url = isNumericId ? `${API_BASE}/api/roles/${role.id}` : `${API_BASE}/api/roles`;
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: role.name,
           description: role.description,
-          permissions: role.permissions,
-          color: role.color,
+          permissions: Array.isArray(role.permissions) ? role.permissions.filter(p => typeof p === 'string') : [],
         }),
       });
       const data = await response.json();
       if (!response.ok) {
+        // try to provide backend error message for UI
+        console.error('saveRole failed', response.status, data);
         return { success: false, error: data.error || 'No se pudo guardar el rol' };
       }
+      // If backend returned a well-formed role, update locally to show immediately
+      if (data && data.id) {
+        setRoles((prev) => {
+          if (method === 'POST') {
+            // avoid duplicates if id already exists
+            if (prev.some((r) => r.id === data.id)) return prev.map((r) => (r.id === data.id ? data : r));
+            return [...prev, data];
+          }
+          return prev.map((r) => (r.id === data.id ? data : r));
+        });
+        return { success: true, role: data };
+      }
+
+      // fallback: refresh roles from backend to ensure consistent state
       await fetchRoles();
       return { success: true, role: data };
     } catch {

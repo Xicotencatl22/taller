@@ -3,6 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { fetchDashboardStats } from '../utils/api';
 
+const formatCurrentDate = () =>
+  new Date().toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
 const PERMISSIONS = ['Dashboard', 'Citas', 'Vehículos', 'Servicios', 'Productos', 'Ventas', 'Compras', 'Cotizaciones', 'Reportes', 'Usuarios', 'Roles'];
 
 function AdminDashboard() {
@@ -40,6 +48,7 @@ function AdminDashboard() {
   // User modal and search
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('Todos los roles');
   const [editingUserId, setEditingUserId] = useState(null);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -57,7 +66,6 @@ function AdminDashboard() {
   const [editingRoleId, setEditingRoleId] = useState(null);
   const [roleName, setRoleName] = useState('');
   const [roleDescription, setRoleDescription] = useState('');
-  const [roleColor, setRoleColor] = useState('#A78BFA');
   const [rolePermissions, setRolePermissions] = useState([]);
   const [roleError, setRoleError] = useState('');
   const [roleNameError, setRoleNameError] = useState('');
@@ -248,7 +256,6 @@ function AdminDashboard() {
     const roleData = {
       name: roleName,
       description: roleDescription,
-      color: roleColor,
       permissions: rolePermissions,
     };
 
@@ -265,7 +272,6 @@ function AdminDashboard() {
     setRoleModalOpen(false);
     setRoleName('');
     setRoleDescription('');
-    setRoleColor('#A78BFA');
     setRolePermissions([]);
   };
 
@@ -274,13 +280,11 @@ function AdminDashboard() {
       setEditingRoleId(role.id);
       setRoleName(role.name);
       setRoleDescription(role.description);
-      setRoleColor(role.color || '#A78BFA');
       setRolePermissions(role.permissions || []);
     } else {
       setEditingRoleId(null);
       setRoleName('');
       setRoleDescription('');
-      setRoleColor('#A78BFA');
       setRolePermissions([]);
     }
     setRoleError('');
@@ -320,7 +324,9 @@ function AdminDashboard() {
     const email = (u.email || '').toLowerCase();
     const role = (u.role || '').toLowerCase();
     const search = (userSearch || '').toLowerCase();
-    return name.includes(search) || email.includes(search) || role.includes(search);
+    const matchesText = name.includes(search) || email.includes(search) || role.includes(search);
+    const matchesRoleFilter = userRoleFilter === 'Todos los roles' || (u.role === userRoleFilter);
+    return matchesText && matchesRoleFilter;
   });
 
   // Count stats for roles
@@ -414,7 +420,7 @@ function AdminDashboard() {
             </svg>
           </button>
           <div className="text-sm text-gray-500 font-medium">
-            miércoles, 13 de mayo de 2026
+            {formatCurrentDate()}
           </div>
         </header>
 
@@ -587,7 +593,7 @@ function AdminDashboard() {
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="flex-1 border border-gray-200 p-2.5 rounded-lg text-sm"
                 />
-                <select className="border border-gray-200 p-2.5 rounded-lg text-sm min-w-[150px]">
+                <select value={userRoleFilter} onChange={(e) => setUserRoleFilter(e.target.value)} className="border border-gray-200 p-2.5 rounded-lg text-sm min-w-[150px]">
                   <option>Todos los roles</option>
                   {roles.map((r) => <option key={r.id} value={r.name}>{r.name}</option>)}
                 </select>
@@ -842,14 +848,7 @@ function AdminDashboard() {
                         ></textarea>
                         {roleDescriptionError && <p className="mt-2 text-sm text-red-600">{roleDescriptionError}</p>}
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-2">Color</label>
-                        <div className="flex gap-2">
-                          {['#A78BFA', '#60A5FA', '#34D399', '#FBBF24', '#F87171', '#FB923C'].map((c) => (
-                            <button key={c} type="button" onClick={() => setRoleColor(c)} className={`w-8 h-8 rounded-lg border-2 ${roleColor === c ? 'border-gray-900' : 'border-gray-300'}`} style={{ backgroundColor: c }}></button>
-                          ))}
-                        </div>
-                      </div>
+                      {/* Color removed: backend does not support role color */}
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-3">Permisos</label>
                         <div className="bg-gray-50 p-4 rounded-lg">
