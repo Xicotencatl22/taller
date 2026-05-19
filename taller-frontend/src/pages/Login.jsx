@@ -170,12 +170,6 @@ function Login() {
             </p>
           </div>
 
-          {/* Quick test info */}
-          <div className="mt-8 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
-            <p className="text-yellow-800 text-sm font-semibold">💡 Usuario Administrador:</p>
-            <p className="text-yellow-700 text-xs mt-1">• Correo: "admin@admin.com"</p>
-            <p className="text-yellow-700 text-xs">• Contraseña: "admin123"</p>
-          </div>
         </div>
       </div>
     </div>

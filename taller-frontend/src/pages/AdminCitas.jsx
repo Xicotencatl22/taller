@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-import { fetchCitas, updateCita, createCita, fetchServicios, fetchVehiculos, createCotizacion, deleteCita } from '../utils/api';
+import { fetchCitas, updateCita, createCitaCompleta, fetchServicios, fetchVehiculos, deleteCita, fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores } from '../utils/api';
 
 const generateFechas = () => {
   const fechas = [];
@@ -33,6 +33,34 @@ export default function AdminCitas() {
   const [citas, setCitas] = useState([]);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
+  const [catMarcas, setCatMarcas] = useState([]);
+  const [catModelos, setCatModelos] = useState([]);
+  const [catAnios, setCatAnios] = useState([]);
+  const [catMotores, setCatMotores] = useState([]);
+
+  // Modal State
+  const [selectedFecha, setSelectedFecha] = useState(null);
+  const [selectedHora, setSelectedHora] = useState('');
+  const [formData, setFormData] = useState({
+    nombre: '',
+    telefono: '',
+    email: '',
+    marca: '',
+    idMarcas: '',
+    modelo: '',
+    idModelos: '',
+    ano: '',
+    idAnio: '',
+    motor: '',
+    idMotores: '',
+    placa: '',
+    servicios: [],
+    notas: ''
+  });
+  const [clientVehicles, setClientVehicles] = useState([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [editingCitaId, setEditingCitaId] = useState(null);
+  const [viewingCita, setViewingCita] = useState(null);
 
   const loadCitas = async () => {
     try {
@@ -89,13 +117,22 @@ export default function AdminCitas() {
 
   useEffect(() => {
     loadCitas();
-    fetchServicios()
-      .then(data => setServiciosDisponibles(data || []))
-      .catch(() => setServiciosDisponibles([]));
-    fetchVehiculos()
-      .then(data => setAllVehicles(data || []))
-      .catch(() => setAllVehicles([]));
+    fetchServicios().then(data => setServiciosDisponibles(data || [])).catch(() => setServiciosDisponibles([]));
+    fetchVehiculos().then(data => setAllVehicles(data || [])).catch(() => setAllVehicles([]));
+    fetchMarcas().then(data => setCatMarcas(data || [])).catch(() => setCatMarcas([]));
+    fetchAnios().then(data => setCatAnios(data || [])).catch(() => setCatAnios([]));
+    fetchMotores().then(data => setCatMotores(data || [])).catch(() => setCatMotores([]));
   }, []);
+
+  useEffect(() => {
+    if (formData.idMarcas) {
+      fetchModelosByMarca(formData.idMarcas)
+        .then(data => setCatModelos(data || []))
+        .catch(() => setCatModelos([]));
+    } else {
+      setCatModelos([]);
+    }
+  }, [formData.idMarcas]);
 
   const handleUpdateCita = async (id, updates) => {
     try {
@@ -119,25 +156,6 @@ export default function AdminCitas() {
     }
   };
 
-  // Modal State
-  const [selectedFecha, setSelectedFecha] = useState(null);
-  const [selectedHora, setSelectedHora] = useState('');
-  const [formData, setFormData] = useState({
-    nombre: '',
-    telefono: '',
-    email: '',
-    marca: '',
-    modelo: '',
-    ano: '',
-    placa: '',
-    servicios: [],
-    notas: ''
-  });
-  const [clientVehicles, setClientVehicles] = useState([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState('');
-  const [editingCitaId, setEditingCitaId] = useState(null);
-  const [viewingCita, setViewingCita] = useState(null);
-
   const getBadgeColor = (estado) => {
     switch (estado) {
       case 'Confirmada': return 'bg-[#d1fae5] text-[#065f46]';
@@ -157,7 +175,7 @@ export default function AdminCitas() {
       setModalStep(1);
       setSelectedFecha(null);
       setSelectedHora('');
-      setFormData({ nombre: '', telefono: '', email: '', marca: '', modelo: '', ano: '', placa: '', servicios: [], notas: '' });
+      setFormData({ nombre: '', telefono: '', email: '', marca: '', idMarcas: '', modelo: '', idModelos: '', ano: '', idAnio: '', motor: '', idMotores: '', placa: '', servicios: [], notas: '' });
       setClientVehicles([]);
       setSelectedVehicleId('');
       setEditingCitaId(null);
@@ -246,22 +264,31 @@ export default function AdminCitas() {
           return total + Number(s?.costo || 0);
         }, 0);
 
-        const cotizacion = await createCotizacion({
-          idUsuarios: null,
-          idVehiculos: null,
-          idServicios: null,
-          idProductos: null,
-          total_estimado: totalEstimado,
-          fecha: fechaStr || new Date().toISOString().slice(0, 10),
-        });
+        const idServiciosArr = formData.servicios.map(sName => {
+          const s = serviciosDisponibles.find(sv => sv.nombre === sName);
+          return s ? s.idServicios : null;
+        }).filter(id => id !== null);
 
-        await createCita({
-          idUsuarios: null,
-          idCotizacion: cotizacion.id,
-          fecha: fechaStr,
+        await createCitaCompleta({
+          cliente: {
+            nombre: formData.nombre,
+            telefono: formData.telefono,
+            email: formData.email
+          },
+          vehiculo: {
+            idVehiculoExistente: selectedVehicleId && selectedVehicleId !== 'nuevo' ? selectedVehicleId : null,
+            idMarcas: formData.idMarcas || null,
+            idModelos: formData.idModelos || null,
+            idAnio: formData.idAnio || null,
+            idMotores: formData.idMotores || null,
+            placa: formData.placa || ''
+          },
+          idServicios: idServiciosArr,
+          totalEstimado: totalEstimado,
+          fecha: fechaStr || new Date().toISOString().slice(0, 10),
           hora: '09:00',
           nota: newNota,
-          estado: 'Pendiente',
+          estado: 'Pendiente'
         });
         alert('¡Cita agendada exitosamente!');
       }
@@ -599,19 +626,64 @@ export default function AdminCitas() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Marca *</label>
-                        <input type="text" placeholder="Toyota, Honda, Nissan..." value={formData.marca} onChange={e=>setFormData({...formData, marca: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <select 
+                          value={formData.idMarcas} 
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const m = catMarcas.find(x => String(x.id) === String(id));
+                            setFormData({...formData, idMarcas: id, marca: m ? m.nombre : '', idModelos: '', modelo: ''});
+                          }} 
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                          <option value="">Selecciona una marca...</option>
+                          {catMarcas.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Modelo</label>
-                        <input type="text" placeholder="Corolla, Civic..." value={formData.modelo} onChange={e=>setFormData({...formData, modelo: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <select 
+                          value={formData.idModelos} 
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const m = catModelos.find(x => String(x.id) === String(id));
+                            setFormData({...formData, idModelos: id, modelo: m ? m.nombre : ''});
+                          }} 
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                          disabled={!formData.idMarcas}
+                        >
+                          <option value="">Selecciona un modelo...</option>
+                          {catModelos.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1.5">Año</label>
-                        <input type="number" placeholder="2020" value={formData.ano} onChange={e=>setFormData({...formData, ano: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <select 
+                          value={formData.idAnio} 
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const a = catAnios.find(x => String(x.id) === String(id));
+                            setFormData({...formData, idAnio: id, ano: a ? a.anio : ''});
+                          }} 
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                          <option value="">Selecciona el año...</option>
+                          {catAnios.map(a => <option key={a.id} value={a.id}>{a.anio}</option>)}
+                        </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Placa</label>
-                        <input type="text" placeholder="ABC-123-XYZ" value={formData.placa} onChange={e=>setFormData({...formData, placa: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none uppercase" />
+                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Motor</label>
+                        <select 
+                          value={formData.idMotores} 
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const mt = catMotores.find(x => String(x.id) === String(id));
+                            setFormData({...formData, idMotores: id, motor: mt ? mt.nombre : ''});
+                          }} 
+                          className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                          <option value="">Selecciona el motor...</option>
+                          {catMotores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        </select>
                       </div>
                     </div>
                     

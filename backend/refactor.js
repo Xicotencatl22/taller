@@ -9,7 +9,7 @@ const oldInit = `const initializeDatabase = async () => {
 
   await pool.query(\`
     CREATE TABLE IF NOT EXISTS roles (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      idroles INT AUTO_INCREMENT PRIMARY KEY,
       nombre VARCHAR(100) NOT NULL UNIQUE,
       descripcion TEXT,
       permisos LONGTEXT,
@@ -190,7 +190,7 @@ content = content.replace(/const \[result\] = await pool\.query/g, 'const result
 content = content.replace(/err\.code === 'ER_DUP_ENTRY'/g, "err.code === '23505'");
 
 content = content.replace(
-  \`const result = await pool.query(
+  `const result = await pool.query(
       'INSERT INTO roles (nombre, descripcion, permisos, color) VALUES (?, ?, ?, ?)',
       [name.trim(), description.trim(), JSON.stringify(permissions), color || '#A78BFA']
     );\`,
@@ -319,3 +319,4 @@ content = content.replace(
 
 fs.writeFileSync('index.js', content);
 console.log('Done refactoring index.js');
+
