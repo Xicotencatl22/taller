@@ -67,7 +67,7 @@ function Login() {
       {/* Left side with blue background */}
       <div className="hidden md:flex md:w-1/2 flex-col justify-between p-12"
         style={{
-          backgroundImage: 'linear-gradient(rgba(10,24,60,0.75), rgba(10,24,60,0.75)),url("/src/assets/f1.jpeg")',
+          backgroundImage: 'linear-gradient(rgba(10,24,60,0.75), rgba(10,24,60,0.75)),url("/assets/f1.jpeg")',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

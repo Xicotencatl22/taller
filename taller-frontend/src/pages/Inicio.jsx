@@ -4,13 +4,13 @@ import Mapa from "/src/components/mapa.jsx";
 
 function Inicio() {
   const imagenes = [
-    "/src/assets/f1.jpeg",
-    "/src/assets/f2.jpeg",
-    "/src/assets/f3.jpeg",
-    "/src/assets/f4.jpeg",
-    "/src/assets/f5.jpeg",
-    "/src/assets/f6.jpeg",
-    "/src/assets/f7.jpeg",
+    "/assets/f1.jpeg",
+    "/assets/f2.jpeg",
+    "/assets/f3.jpeg",
+    "/assets/f4.jpeg",
+    "/assets/f5.jpeg",
+    "/assets/f6.jpeg",
+    "/assets/f7.jpeg",
   ];
 
   const [index, setIndex] = useState(0);
