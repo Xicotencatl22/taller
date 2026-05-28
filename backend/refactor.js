@@ -9,7 +9,7 @@ const oldInit = `const initializeDatabase = async () => {
 
   await pool.query(\`
     CREATE TABLE IF NOT EXISTS roles (
-      idroles INT AUTO_INCREMENT PRIMARY KEY,
+      id INT AUTO_INCREMENT PRIMARY KEY,
       nombre VARCHAR(100) NOT NULL UNIQUE,
       descripcion TEXT,
       permisos LONGTEXT,
