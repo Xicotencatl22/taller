@@ -43,6 +43,9 @@ const proveedorRoutes = require('./routes/proveedorRoutes');
 const compraRoutes = require('./routes/compraRoutes');
 const reportesRoutes = require('./routes/reportes');
 const catalogoRoutes = require('./routes/catalogoRoutes');
+const authRoutes = require('./routes/authRoutes');
+const usersRoutes = require('./routes/usersRoutes');
+const rolesRoutes = require('./routes/rolesRoutes');
 
 const app = express();
 app.use(cors());
@@ -527,6 +530,9 @@ app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/compras', compraRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/catalogo', catalogoRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/roles', rolesRoutes);
 
 
 // ---------------------------------------------------------------------------
