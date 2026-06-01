@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import { fetchCotizaciones, createCotizacion, fetchServicios, fetchVehiculos, deleteCotizacion } from '../utils/api';
 
 export default function Cotizaciones() {
+  const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cotizaciones, setCotizaciones] = useState([]);
   const [serviciosList, setServiciosList] = useState([]);
@@ -147,10 +149,10 @@ export default function Cotizaciones() {
       });
       setVehiculosCliente([]);
       loadCotizaciones();
-      alert('Cotización creada correctamente.');
+      toast.success('La cotización ha sido creada exitosamente.');
     } catch (error) {
       console.error('No se pudo crear la cotización:', error);
-      alert('Error al crear la cotización. Intenta de nuevo.');
+      toast.error('Error al crear la cotización. Intenta de nuevo.');
     }
   };
 
@@ -160,10 +162,10 @@ export default function Cotizaciones() {
       await deleteCotizacion(id);
       loadCotizaciones();
       setDetalleModal(null);
-      alert('Cotización eliminada correctamente.');
+      toast.success('Cotización eliminada correctamente.');
     } catch (error) {
       console.error('Error al eliminar cotización:', error);
-      alert('No se pudo eliminar la cotización: ' + (error.message || 'Error desconocido'));
+      toast.error(error.message || 'Error desconocido', 'No se pudo eliminar');
     }
   };
 

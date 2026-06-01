@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-import { fetchCitas, updateCita, createCitaCompleta, fetchServicios, fetchVehiculos, deleteCita, fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores } from '../utils/api';
+import { useToast } from '../components/Toast';
+import { fetchCitas, updateCita, createCitaCompleta, fetchServicios, fetchVehiculos, deleteCita, fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores, fetchUsers } from '../utils/api';
 
 const generateFechas = () => {
   const fechas = [];
@@ -26,12 +27,14 @@ const generateFechas = () => {
 
 const fechasDisponibles = generateFechas();
 export default function AdminCitas() {
+  const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalStep, setModalStep] = useState(1);
 
   // Appointments state
   const [citas, setCitas] = useState([]);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
   const [catMarcas, setCatMarcas] = useState([]);
   const [catModelos, setCatModelos] = useState([]);
@@ -61,6 +64,10 @@ export default function AdminCitas() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [editingCitaId, setEditingCitaId] = useState(null);
   const [viewingCita, setViewingCita] = useState(null);
+
+  // Reagendar modal
+  const [reagendarCita, setReagendarCita] = useState(null); // cita a reagendar
+  const [fechaReagendar, setFechaReagendar] = useState(null);
 
   const loadCitas = async () => {
     try {
@@ -117,6 +124,7 @@ export default function AdminCitas() {
 
   useEffect(() => {
     loadCitas();
+    fetchUsers().then(data => setAllUsers(data || [])).catch(() => setAllUsers([]));
     fetchServicios().then(data => setServiciosDisponibles(data || [])).catch(() => setServiciosDisponibles([]));
     fetchVehiculos().then(data => setAllVehicles(data || [])).catch(() => setAllVehicles([]));
     fetchMarcas().then(data => setCatMarcas(data || [])).catch(() => setCatMarcas([]));
@@ -140,8 +148,23 @@ export default function AdminCitas() {
       loadCitas();
     } catch (error) {
       console.error('Error actualizando cita:', error);
-      alert('No se pudo actualizar la cita. Por favor, inténtalo de nuevo.');
+      toast.error('No se pudo actualizar la cita. Por favor, inténtalo de nuevo.');
     }
+  };
+
+  const handleReagendar = (cita) => {
+    setReagendarCita(cita);
+    setFechaReagendar(null);
+  };
+
+  const confirmarReagendado = async () => {
+    if (!fechaReagendar) { toast.warning('Selecciona una fecha primero.'); return; }
+    const meses = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
+    const fechaStr = `${fechaReagendar.year}-${meses[fechaReagendar.mes]}-${fechaReagendar.dia.padStart(2, '0')}`;
+    await handleUpdateCita(reagendarCita.id, { estado: 'Reagendada', fecha: fechaStr });
+    toast.success(`Cita reagendada para el ${fechaReagendar.dia} de ${fechaReagendar.mes} de ${fechaReagendar.year}.`, '¡Reagendado!');
+    setReagendarCita(null);
+    setFechaReagendar(null);
   };
 
   const handleDeleteCita = async (id) => {
@@ -151,7 +174,7 @@ export default function AdminCitas() {
         loadCitas();
       } catch (err) {
         console.error(err);
-        alert('Error al eliminar la cita.');
+        toast.error('Error al eliminar la cita.');
       }
     }
   };
@@ -257,7 +280,7 @@ export default function AdminCitas() {
           nota: newNota,
           fecha: fechaStr || undefined
         });
-        alert('¡Datos actualizados exitosamente!');
+        toast.success('Los datos de la cita han sido actualizados.', '¡Actualizado!');
       } else {
         const totalEstimado = formData.servicios.reduce((total, sName) => {
           const s = serviciosDisponibles.find(sv => sv.nombre === sName);
@@ -290,13 +313,13 @@ export default function AdminCitas() {
           nota: newNota,
           estado: 'Pendiente'
         });
-        alert('¡Cita agendada exitosamente!');
+        toast.success('La cita ha sido agendada exitosamente.', '¡Cita agendada!');
       }
       
       handleCloseModal();
       loadCitas();
     } catch (err) {
-      alert(`Error al guardar la cita: ${err.message}`);
+      toast.error(err.message, 'Error al guardar la cita');
     }
   };
 
@@ -411,7 +434,7 @@ export default function AdminCitas() {
                 <div className="flex gap-2">
                   <button onClick={() => setViewingCita(cita)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Ver detalles</button>
                   <button onClick={() => handleUpdateCita(cita.id, { estado: 'Confirmada' })} className="bg-[#10b981] hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Confirmar</button>
-                  <button onClick={() => handleUpdateCita(cita.id, { estado: 'Reagendada' })} className="bg-[#f59e0b] hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reagendar</button>
+                  <button onClick={() => handleReagendar(cita)} className="bg-[#f59e0b] hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors">Reagendar</button>
                   <button onClick={() => handleEditCitaClick(cita)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Editar</button>
                 </div>
                 <button onClick={() => handleDeleteCita(cita.id)} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
@@ -505,9 +528,72 @@ export default function AdminCitas() {
               {modalStep === 2 && (
                 <div className="max-w-3xl mx-auto space-y-6">
                   
-                  {/* Info Cliente */}
+                  {/* Info Cliente — el correo va PRIMERO como disparador de autocompletado */}
                   <div>
                     <h3 className="text-base font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Información del cliente</h3>
+
+                    {/* Correo primero — dispara el autocompletado */}
+                    <div className="mb-4">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                        Correo electrónico
+                        <span className="ml-1 text-blue-500 font-normal">— ingresa para autocompletar</span>
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="juan@email.com"
+                        value={formData.email}
+                        onChange={e => {
+                          const newEmail = e.target.value;
+                          setFormData(prev => ({ ...prev, email: newEmail }));
+
+                          if (newEmail.length > 5) {
+                            // Buscar en usuarios primero
+                            const matchedUser = allUsers.find(u => u.email?.toLowerCase() === newEmail.trim().toLowerCase());
+                            
+                            // Buscar vehículos asociados (por el email que tipearon)
+                            const matchedVehicles = allVehicles.filter(v => {
+                              const correo = (v.propietario_correo || v.propietario_email || v.email || '').toLowerCase();
+                              return correo === newEmail.trim().toLowerCase();
+                            });
+                            
+                            setClientVehicles(matchedVehicles);
+
+                            if (matchedUser) {
+                               setFormData(prev => ({
+                                 ...prev,
+                                 nombre: matchedUser.name || matchedUser.nombre || prev.nombre,
+                                 telefono: matchedUser.phone || matchedUser.telefono || prev.telefono,
+                                 marca: '', modelo: '', ano: '', placa: '', idMarcas: '', idModelos: '', idAnio: ''
+                               }));
+                               setSelectedVehicleId(matchedVehicles.length === 1 ? (matchedVehicles[0].idVehiculos || matchedVehicles[0].id || '') : '');
+                            } else if (matchedVehicles.length > 0) {
+                               const v = matchedVehicles[0];
+                               setFormData(prev => ({
+                                 ...prev,
+                                 nombre: v.propietario_nombre || v.propietario || v.nombre_propietario || prev.nombre,
+                                 telefono: v.propietario_telefono || v.telefono_propietario || v.telefono || prev.telefono,
+                                 marca: '', modelo: '', ano: '', placa: '', idMarcas: '', idModelos: '', idAnio: ''
+                               }));
+                               setSelectedVehicleId(matchedVehicles.length === 1 ? (v.idVehiculos || v.id || '') : '');
+                            } else {
+                               setSelectedVehicleId('');
+                            }
+                          } else {
+                            setClientVehicles([]);
+                            setSelectedVehicleId('');
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      {(clientVehicles.length > 0 || allUsers.some(u => u.email?.toLowerCase() === formData.email.trim().toLowerCase())) && formData.email.length > 5 && (
+                        <p className="mt-1.5 text-xs text-green-600 flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Cliente encontrado — datos autocompletados
+                        </p>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5">
@@ -523,56 +609,6 @@ export default function AdminCitas() {
                         </label>
                         <input type="tel" placeholder="123-456-7890" value={formData.telefono} onChange={e=>setFormData({...formData, telefono: e.target.value})} className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
                       </div>
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-2 text-xs font-semibold text-gray-600 mb-1.5">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
-                        Correo electrónico (opcional)
-                      </label>
-                      <input 
-                        type="email" 
-                        placeholder="juan@email.com" 
-                        value={formData.email} 
-                        onChange={e => {
-                          const newEmail = e.target.value;
-                          setFormData(prev => ({ ...prev, email: newEmail }));
-                          
-                          if (newEmail.length > 5) {
-                            const matched = allVehicles.filter(v => v.propietario_correo?.toLowerCase() === newEmail.trim().toLowerCase());
-                            setClientVehicles(matched);
-                            
-                            if (matched.length === 1) {
-                              const v = matched[0];
-                              setFormData(prev => ({
-                                ...prev,
-                                nombre: v.propietario_nombre || v.propietario || prev.nombre,
-                                telefono: v.propietario_telefono || prev.telefono,
-                                marca: v.marca || prev.marca,
-                                modelo: v.modelo || prev.modelo,
-                                ano: v.año || v.anio || prev.ano,
-                                placa: v.placas || v.placa || prev.placa,
-                              }));
-                              setSelectedVehicleId(v.idVehiculos || v.id || '1');
-                            } else if (matched.length > 1) {
-                              const v = matched[0];
-                              setFormData(prev => ({
-                                ...prev,
-                                nombre: v.propietario_nombre || v.propietario || prev.nombre,
-                                telefono: v.propietario_telefono || prev.telefono,
-                                marca: '', modelo: '', ano: '', placa: ''
-                              }));
-                              setSelectedVehicleId('');
-                            } else {
-                              setClientVehicles([]);
-                              setSelectedVehicleId('');
-                            }
-                          } else {
-                            setClientVehicles([]);
-                            setSelectedVehicleId('');
-                          }
-                        }} 
-                        className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" 
-                      />
                     </div>
                   </div>
 
@@ -831,7 +867,7 @@ export default function AdminCitas() {
             {/* Header decorativo */}
             <div className={`h-24 absolute top-0 w-full ${getBadgeColor(viewingCita.estado).split(' ')[0]} opacity-20`}></div>
             
-            <button onClick={() => setViewingCita(null)} className="absolute right-5 top-5 z-10 text-gray-500 hover:text-gray-800 bg-white/50 rounded-full p-1 backdrop-blur-sm">
+            <button onClick={() => setViewingCita(null)} className="absolute right-5 top-5 z-50 text-gray-600 hover:text-gray-900 bg-white/80 hover:bg-white rounded-full p-1.5 backdrop-blur-sm cursor-pointer transition-all shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
 
@@ -929,6 +965,78 @@ export default function AdminCitas() {
                 </button>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Reagendar cita ── */}
+      {reagendarCita && (
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Reagendar cita</h3>
+                  <p className="text-xs text-gray-500">{reagendarCita.cliente}</p>
+                </div>
+              </div>
+              <button onClick={() => { setReagendarCita(null); setFechaReagendar(null); }} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Body — fecha selector */}
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">Selecciona la nueva fecha para esta cita:</p>
+              <div className="grid grid-cols-4 gap-3">
+                {fechasDisponibles.map((f, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setFechaReagendar(f)}
+                    className={`p-3 rounded-xl border-2 text-center transition-all ${
+                      fechaReagendar?.dia === f.dia && fechaReagendar?.mes === f.mes
+                        ? 'border-amber-400 bg-amber-50 shadow-sm shadow-amber-200'
+                        : 'border-gray-100 hover:border-amber-300 bg-white'
+                    }`}
+                  >
+                    <div className="text-[10px] font-bold text-gray-400 mb-1">{f.diaSemana}</div>
+                    <div className="text-xl font-black text-gray-900">{f.dia}</div>
+                    <div className="text-xs font-medium text-gray-500">{f.mes}</div>
+                  </button>
+                ))}
+              </div>
+
+              {fechaReagendar && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-800 font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Nueva fecha: {fechaReagendar.diaSemana} {fechaReagendar.dia} de {fechaReagendar.mes} {fechaReagendar.year}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setReagendarCita(null); setFechaReagendar(null); }}
+                className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarReagendado}
+                disabled={!fechaReagendar}
+                className={`px-5 py-2.5 text-sm font-bold text-white rounded-lg transition ${fechaReagendar ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              >
+                Confirmar reagendado
+              </button>
             </div>
           </div>
         </div>

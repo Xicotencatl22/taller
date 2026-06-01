@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import {
   fetchServicios,
   createServicio,
@@ -14,6 +15,7 @@ import {
 } from '../utils/api';
 
 export default function AdminServicios() {
+  const toast = useToast();
   const [servicios, setServicios] = useState([]);
   const [loadingServicios, setLoadingServicios] = useState(true);
 
@@ -134,7 +136,7 @@ export default function AdminServicios() {
       await loadServiciosYProductos();
       cerrarModal();
     } catch (err) {
-      alert(`Error al guardar el servicio: ${err.message}`);
+      toast.error(err.message, 'Error al guardar el servicio');
     }
   };
 
@@ -159,7 +161,7 @@ export default function AdminServicios() {
       await deleteServicio(id);
       await loadServiciosYProductos();
     } catch (err) {
-      alert(`Error al eliminar: ${err.message}`);
+      toast.error(err.message, 'Error al eliminar');
     }
   };
 
@@ -222,7 +224,7 @@ export default function AdminServicios() {
       setCompatForm({ idMarcas: '', idModelos: '', cantidad: 1, precio_especial: '' });
       setModelos([]);
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(err.message);
     }
   };
 
@@ -231,7 +233,7 @@ export default function AdminServicios() {
       await deleteCompatibilidad(id);
       setCompatEntries(prev => prev.filter(e => e.id !== id));
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(err.message);
     }
   };
 
@@ -431,7 +433,10 @@ export default function AdminServicios() {
                     <select value={compatForm.idMarcas} onChange={e => handleCompatMarcaChange(e.target.value)}
                       className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none">
                       <option value="">-- Selecciona marca --</option>
-                      {marcas.map(m => <option key={m.idmarca} value={m.idmarca}>{m.nombre}</option>)}
+                      {marcas.map(m => {
+                        const mId = m.idmarca ?? m.idMarcas ?? m.id;
+                        return <option key={mId} value={mId}>{m.nombre}</option>;
+                      })}
                     </select>
                   </div>
                   <div>
@@ -440,7 +445,10 @@ export default function AdminServicios() {
                       disabled={!compatForm.idMarcas || modelos.length === 0}
                       className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100">
                       <option value="">-- Selecciona modelo --</option>
-                      {modelos.map(m => <option key={m.idmodelo} value={m.idmodelo}>{m.nombre}</option>)}
+                      {modelos.map(m => {
+                        const mId = m.idmodelo ?? m.idModelos ?? m.id;
+                        return <option key={mId} value={mId}>{m.nombre}</option>;
+                      })}
                     </select>
                   </div>
                   <div>

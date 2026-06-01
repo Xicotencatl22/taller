@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import { fetchProductos, createProducto, updateProducto, deleteProducto } from '../utils/api';
 
 export default function Productos() {
+  const toast = useToast();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nuevo, setNuevo] = useState({
@@ -20,6 +22,8 @@ export default function Productos() {
   const [showModal, setShowModal] = useState(false);
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
   const [soloBajoStock, setSoloBajoStock] = useState(false);
+  const [ajustarStockProducto, setAjustarStockProducto] = useState(null);
+  const [nuevoStockVal, setNuevoStockVal] = useState('');
 
   const loadProductos = async () => {
     try {
@@ -67,7 +71,7 @@ export default function Productos() {
       resetForm();
       setEditando(false);
     } catch (err) {
-      alert(`Error al guardar el producto: ${err.message}`);
+      toast.error(err.message, 'Error al guardar el producto');
     }
   };
 
@@ -93,18 +97,25 @@ export default function Productos() {
       await deleteProducto(id);
       await loadProductos();
     } catch (err) {
-      alert(`Error al eliminar: ${err.message}`);
+      toast.error(err.message, 'Error al eliminar');
     }
   };
 
-  const handleAjustarStock = async (p) => {
-    const newStock = window.prompt(`Ingresa el nuevo stock para ${p.nombre}:`, p.stock_actual);
-    if (newStock !== null && !isNaN(newStock) && newStock.trim() !== '') {
+  const handleAjustarStock = (p) => {
+    setAjustarStockProducto(p);
+    setNuevoStockVal(p.stock_actual);
+  };
+
+  const confirmarAjusteStock = async (e) => {
+    e.preventDefault();
+    if (nuevoStockVal !== null && !isNaN(nuevoStockVal) && String(nuevoStockVal).trim() !== '') {
       try {
-        await updateProducto(p.idproductos, { ...p, stock_actual: Number(newStock) });
+        await updateProducto(ajustarStockProducto.idproductos || ajustarStockProducto.idProductos || ajustarStockProducto.id, { ...ajustarStockProducto, stock_actual: Number(nuevoStockVal) });
         await loadProductos();
+        toast.success('Stock actualizado exitosamente');
+        setAjustarStockProducto(null);
       } catch (err) {
-        alert(`Error al ajustar stock: ${err.message}`);
+        toast.error(err.message, 'Error al ajustar stock');
       }
     }
   };
@@ -257,15 +268,12 @@ export default function Productos() {
                     <div className="text-gray-500 w-full md:w-auto">
                       Valor en inventario: <strong className="text-gray-900 ml-1">${(stockActual * Number(p.precio_venta || 0)).toLocaleString()}</strong>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto justify-end">
+                    <div className="flex w-full md:w-auto justify-end">
                       <button
                         onClick={() => handleAjustarStock(p)}
-                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-medium hover:bg-blue-700 w-full md:w-auto text-center"
+                        className="bg-[#1a56db] text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-blue-800 transition shadow-sm w-full md:w-auto text-center"
                       >
                         Ajustar stock
-                      </button>
-                      <button className="bg-gray-50 border border-gray-200 text-gray-600 px-4 py-1.5 rounded-lg font-medium hover:bg-gray-100 w-full md:w-auto text-center">
-                        Ver movimientos
                       </button>
                     </div>
                   </div>
@@ -372,6 +380,63 @@ export default function Productos() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Ajustar Stock */}
+      {ajustarStockProducto && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-bold text-gray-900">Ajustar stock</h2>
+              </div>
+              <button type="button" onClick={() => setAjustarStockProducto(null)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-50 p-1.5 rounded-lg transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <form onSubmit={confirmarAjusteStock} className="p-5">
+              <p className="text-sm text-gray-500 mb-4">
+                Ingresa la nueva cantidad en existencia para el producto <strong className="text-gray-800">{ajustarStockProducto.nombre}</strong>.
+              </p>
+              
+              <div className="mb-6">
+                <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Cantidad de stock actual</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    required
+                    min="0"
+                    autoFocus
+                    value={nuevoStockVal} 
+                    onChange={e => setNuevoStockVal(e.target.value)}
+                    className="w-full text-center text-3xl font-black text-gray-900 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-0 outline-none transition-colors"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-1">
+                     <button type="button" onClick={() => setNuevoStockVal(Number(nuevoStockVal) + 1)} className="text-gray-400 hover:text-gray-700"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg></button>
+                     <button type="button" onClick={() => setNuevoStockVal(Math.max(0, Number(nuevoStockVal) - 1))} className="text-gray-400 hover:text-gray-700"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg></button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setAjustarStockProducto(null)} className="flex-1 px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                  Cancelar
+                </button>
+                <button type="submit" className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-md">
+                  Confirmar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

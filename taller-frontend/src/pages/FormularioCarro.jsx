@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import {
-  createCotizacion, createCita,
+  createCotizacion, createCita, createCitaCompleta,
   fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores,
   fetchServicios, fetchProductosCompatibles
 } from '../utils/api';
@@ -35,6 +36,7 @@ function FormularioCarro() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useContext(AuthContext);
+  const toast = useToast();
 
 
   const [form, setForm] = useState({
@@ -164,46 +166,56 @@ function FormularioCarro() {
 
   const handleConfirmarCita = async () => {
     if (!selectedFecha) {
-      alert('Por favor, selecciona fecha antes de confirmar la cita.');
+      toast.warning('Por favor, selecciona una fecha antes de confirmar la cita.');
       return;
     }
 
-    const marcaObj = marca.find(m => String(m.idmarca) === String(form.idmarca));
-    const modeloObj = modelos.find(m => String(m.idmodelo) === String(form.idmodelo));
-    const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${form.idanio}`.trim();
+    const marcaObj = marca.find(m => String(m.idmarca ?? m.idMarcas ?? m.id) === String(form.idmarca));
+    const modeloObj = modelos.find(m => String(m.idmodelo ?? m.idModelos ?? m.id) === String(form.idmodelo));
+    const anioObj = anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio));
+    const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${anioObj?.anio || anioObj?.nombre || form.idanio}`.trim();
     const totalEstimado = getTotalEstimado();
 
     try {
-      const cotizacion = await createCotizacion({
-        idUsuarios: null,
-        idVehiculos: null,
-        idServicios: null,
-        idProductos: null,
-        total_estimado: totalEstimado,
-        fecha: new Date().toISOString().slice(0, 10),
-      });
+      const idServiciosArr = form.servicios.map(sName => {
+        const s = serviciosDisponibles.find(sv => sv.nombre === sName);
+        return s ? s.idServicios || s.id : null;
+      }).filter(id => id !== null);
 
       const meses = { Ene: '01', Feb: '02', Mar: '03', Abr: '04', May: '05', Jun: '06', Jul: '07', Ago: '08', Sep: '09', Oct: '10', Nov: '11', Dic: '12' };
       const fechaStr = `${selectedFecha.year}-${meses[selectedFecha.mes]}-${selectedFecha.dia.padStart(2, '0')}`;
-
-      const vehiculoText = `${marcaObj?.nombre || ''} ${modeloObj?.nombre || ''} ${form.idanio}`.trim();
       const serviciosText = form.servicios?.length > 0 ? form.servicios.join(', ') : 'Servicio General';
       
-      await createCita({
-        idUsuarios: currentUser?.id || null,
-        idCotizacion: cotizacion.id,
+      const newNota = `Cliente: ${contactoForm.nombre} - ${contactoForm.telefono} | Vehículo: ${vehiculoText} | Servicios: ${serviciosText}` + (contactoForm.notas ? ` | Notas: ${contactoForm.notas}` : '');
+
+      await createCitaCompleta({
+        cliente: {
+          nombre: contactoForm.nombre,
+          telefono: contactoForm.telefono,
+          email: contactoForm.correo || ''
+        },
+        vehiculo: {
+          idVehiculoExistente: null,
+          idMarcas: form.idmarca,
+          idModelos: form.idmodelo,
+          idAnio: form.idanio,
+          idMotores: form.idmotor,
+          placa: form.placa || ''
+        },
+        idServicios: idServiciosArr,
+        totalEstimado: totalEstimado,
         fecha: fechaStr,
         hora: '09:00',
-        nota: `Cliente: ${contactoForm.nombre} - ${contactoForm.telefono} | Vehículo: ${vehiculoText} | Servicios: ${serviciosText}` + (contactoForm.notas ? ` | Notas: ${contactoForm.notas}` : ''),
+        nota: newNota,
         estado: 'Pendiente'
       });
 
-      alert("¡Tu cita se ha confirmado exitosamente! Hemos notificado al administrador.");
+      toast.success('Hemos notificado al administrador. Te contactaremos pronto.', '¡Cita confirmada!');
       closeAndResetModal();
       navigate('/');
     } catch (error) {
       console.error('Error al crear la cotización o cita:', error);
-      alert('No se pudo crear la cita. Por favor, inténtalo de nuevo.');
+      toast.error('No se pudo crear la cita. Por favor, inténtalo de nuevo.');
     }
   };
 
@@ -354,9 +366,10 @@ function FormularioCarro() {
                   className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white"
                 >
                   <option value="">Selecciona una marca</option>
-                  {marca.map((marc) => (
-                    <option key={marc.idmarca} value={marc.idmarca}>{marc.nombre}</option>
-                  ))}
+                  {marca.map((marc) => {
+                    const id = marc.idmarca ?? marc.idMarcas ?? marc.id;
+                    return <option key={id} value={id}>{marc.nombre}</option>;
+                  })}
                 </select>
               </div>
             </div>
@@ -374,9 +387,10 @@ function FormularioCarro() {
                   disabled={!form.idmarca}
                 >
                   <option value="">Selecciona un modelo</option>
-                  {modelos.map((modelo) => (
-                    <option key={modelo.idmodelo} value={modelo.idmodelo}>{modelo.nombre}</option>
-                  ))}
+                  {modelos.map((modelo) => {
+                    const id = modelo.idmodelo ?? modelo.idModelos ?? modelo.id;
+                    return <option key={id} value={id}>{modelo.nombre}</option>;
+                  })}
                 </select>
               </div>
               <div>
@@ -627,7 +641,7 @@ function FormularioCarro() {
                       <div className="text-sm font-medium text-gray-500 mb-2">Vehículo</div>
                       <div className="text-base font-semibold text-gray-900 flex flex-col gap-1">
                         <span>
-                          {marca.find(m => String(m.idmarca) === String(form.idmarca))?.nombre || 'Marca'} {modelos.find(m => String(m.idmodelo) === String(form.idmodelo))?.nombre || 'Modelo'} {anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.anio || anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.nombre || form.idanio || 'Año'}
+                          {marca.find(m => String(m.idmarca ?? m.idMarcas ?? m.id) === String(form.idmarca))?.nombre || 'Marca'} {modelos.find(m => String(m.idmodelo ?? m.idModelos ?? m.id) === String(form.idmodelo))?.nombre || 'Modelo'} {anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.anio || anio.find(a => String(a.idanio || a.idAnio || a.id || a.value) === String(form.idanio))?.nombre || form.idanio || 'Año'}
                         </span>
                         <span className="text-sm font-normal text-gray-600">
                           {form.idmotor ? `Motor: ${motores.find(m => String(m.idmotor || m.idMotores || m.id || m.value) === String(form.idmotor))?.nombre || form.idmotor} | ` : ''} 

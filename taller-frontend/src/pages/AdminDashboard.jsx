@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import { fetchDashboardStats } from '../utils/api';
 
 const formatCurrentDate = () =>
@@ -17,6 +18,7 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { roles, users, saveRole, deleteRole, saveUser, deleteUser, fetchUsers } = useContext(AuthContext);
+  const toast = useToast();
 
   const [tab, setTab] = useState(location.state?.tab || 'dashboard');
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -306,7 +308,7 @@ function AdminDashboard() {
     if (window.confirm('¿Eliminar este usuario?')) {
       const result = await deleteUser(id);
       if (!result.success) {
-        alert(result.error || 'No se pudo eliminar el usuario.');
+        toast.error(result.error || 'No se pudo eliminar el usuario.');
       }
     }
   };

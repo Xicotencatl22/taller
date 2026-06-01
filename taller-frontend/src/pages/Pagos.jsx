@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import AdminLayout from "../layouts/AdminLayout";
+import { useToast } from "../components/Toast";
 
 export default function Pagos() {
+  const toast = useToast();
   const total = 1250;
   const [metodo, setMetodo] = useState("efectivo");
   const [monto, setMonto] = useState(1500);
@@ -25,7 +27,7 @@ export default function Pagos() {
   };
 
   const procesar = () => {
-    alert("Pago procesado correctamente");
+    toast.success('El pago ha sido registrado correctamente.', 'Pago procesado');
   };
 
   return (

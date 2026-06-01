@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import { fetchCompras, fetchProveedores, fetchBajoStock, createCompra, fetchProductos } from '../utils/api';
 
 export default function Compras() {
+  const toast = useToast();
   const [compras, setCompras] = useState([]);
   const [bajoStock, setBajoStock] = useState([]);
   const [proveedores, setProveedores] = useState([]);
@@ -61,7 +63,7 @@ export default function Compras() {
         productos: [{ id: Date.now(), productoId: '', cantidad: 1, costo: 0, total: 0 }]
       });
     } catch (err) {
-      alert('Error al crear orden: ' + err.message);
+      toast.error(err.message, 'Error al crear la orden');
     }
   };
 

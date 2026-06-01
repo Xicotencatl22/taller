@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import { 
   fetchVehiculos, createVehiculo, updateVehiculo, deleteVehiculo,
   fetchMarcas, fetchModelosByMarca, fetchAnios, fetchMotores, fetchUsers
@@ -8,6 +9,7 @@ import {
 export default function Vehiculos() {
   const [vehiculos, setVehiculos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
   
   // Catálogos
   const [marcas, setMarcas] = useState([]);
@@ -99,7 +101,7 @@ export default function Vehiculos() {
       await loadData();
       cerrarModal();
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(err.message, 'Error al guardar');
     }
   };
 
@@ -126,7 +128,7 @@ export default function Vehiculos() {
       await deleteVehiculo(id);
       await loadData();
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      toast.error(err.message, 'Error al eliminar');
     }
   };
 
@@ -244,9 +246,6 @@ export default function Vehiculos() {
 
                   {/* Card Actions */}
                   <div className="mt-5 flex gap-3">
-                    <button className="flex-1 bg-[#1a56db] text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors">
-                      Ver historial
-                    </button>
                     <button onClick={() => prepararEdicion(v)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
                       Editar
                     </button>
@@ -314,7 +313,7 @@ export default function Vehiculos() {
                         value={nuevo.idMarcas} onChange={e => setNuevo({...nuevo, idMarcas: e.target.value})}>
                         <option value="">Seleccionar marca</option>
                         {marcas.map(m => {
-                          const mId = m.idmarca || m.idMarcas || m.idmarcas;
+                          const mId = m.idmarca || m.idMarcas || m.idmarcas || m.id;
                           return <option key={mId} value={mId}>{m.nombre}</option>
                         })}
                       </select>
@@ -324,7 +323,10 @@ export default function Vehiculos() {
                       <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium" required
                         value={nuevo.idModelos} onChange={e => setNuevo({...nuevo, idModelos: e.target.value})} disabled={!nuevo.idMarcas}>
                         <option value="">Seleccionar modelo</option>
-                        {modelos.map(m => <option key={m.idmodelo} value={m.idmodelo}>{m.nombre}</option>)}
+                        {modelos.map(m => {
+                          const mId = m.idmodelo ?? m.idModelos ?? m.id;
+                          return <option key={mId} value={mId}>{m.nombre}</option>;
+                        })}
                       </select>
                     </div>
                   </div>
@@ -335,7 +337,11 @@ export default function Vehiculos() {
                       <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium" required
                         value={nuevo.idAnio} onChange={e => setNuevo({...nuevo, idAnio: e.target.value})}>
                         <option value="">Seleccionar año</option>
-                        {anios.map(a => <option key={a.idanio} value={a.idanio}>{a.anio}</option>)}
+                        {anios.map(a => {
+                          const aId = a.idanio ?? a.idAnio ?? a.id;
+                          const aLabel = a.anio ?? a.nombre ?? aId;
+                          return <option key={aId} value={aId}>{aLabel}</option>;
+                        })}
                       </select>
                     </div>
                     <div>
@@ -364,7 +370,10 @@ export default function Vehiculos() {
                       <select className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium" required
                         value={nuevo.idMotores} onChange={e => setNuevo({...nuevo, idMotores: e.target.value})}>
                         <option value="">Seleccionar motor</option>
-                        {motores.map(m => <option key={m.idmotor} value={m.idmotor}>{m.nombre}</option>)}
+                        {motores.map(m => {
+                          const mId = m.idmotor ?? m.idMotores ?? m.id;
+                          return <option key={mId} value={mId}>{m.nombre}</option>;
+                        })}
                       </select>
                     </div>
                     <div>

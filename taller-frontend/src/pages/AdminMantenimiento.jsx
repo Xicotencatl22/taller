@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { useToast } from '../components/Toast';
 import {
   fetchUsers,
   fetchVehiculos,
@@ -14,6 +15,7 @@ import {
 } from '../utils/api';
 
 export default function AdminMantenimiento() {
+  const toast = useToast();
   const [mantenimientos, setMantenimientos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [citasPendientes, setCitasPendientes] = useState([]);
@@ -130,7 +132,7 @@ export default function AdminMantenimiento() {
     if (srv) {
       // Evitar duplicados de servicio
       if (trabajos.find(t => t.id === srv.id)) {
-        alert("El servicio ya fue agregado.");
+        toast.warning('Este servicio ya fue agregado.');
         return;
       }
 
@@ -244,7 +246,10 @@ export default function AdminMantenimiento() {
 
   const manejarEnvio = async (e) => {
     e.preventDefault();
-    if (!nuevo.idVehiculos) return alert("Selecciona un vehículo");
+    if (!nuevo.idVehiculos) {
+      toast.warning('Selecciona un vehículo antes de continuar.');
+      return;
+    }
 
     try {
       const payload = {
@@ -269,7 +274,7 @@ export default function AdminMantenimiento() {
       await loadData();
       cerrarModal();
     } catch (err) {
-      alert(`Error al crear orden: ${err.message}`);
+      toast.error(err.message, 'Error al crear la orden');
     }
   };
 
@@ -279,7 +284,7 @@ export default function AdminMantenimiento() {
       await updateMantenimientoEstado(mId, nuevoEstado);
       await loadData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
